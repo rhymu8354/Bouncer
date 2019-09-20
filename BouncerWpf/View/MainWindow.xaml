@@ -1,0 +1,26 @@
+﻿<Window x:Class="Bouncer.Wpf.View.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Bouncer.Wpf.View"
+        mc:Ignorable="d"
+        Title="Bouncer" Height="600" Width="1250"
+        Closed="OnClosed">
+    <Window.CommandBindings>
+        <CommandBinding Command="local:Commands.Exit" Executed="OnExit" />
+    </Window.CommandBindings>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Menu Grid.Row="0">
+            <MenuItem Header="_File" Width="50">
+                <MenuItem Header="E_xit" ToolTip="Close the Application" Command="local:Commands.Exit" InputGestureText="Alt+F4" />
+            </MenuItem>
+        </Menu>
+        <Grid Grid.Row="1">
+        </Grid>
+    </Grid>
+</Window>
