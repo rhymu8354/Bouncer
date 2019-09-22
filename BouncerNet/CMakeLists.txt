@@ -28,9 +28,12 @@ if(MSVC)
     )
 
     set(Source
+        ${CMAKE_CURRENT_BINARY_DIR}/Configuration.cs
+        ${CMAKE_CURRENT_BINARY_DIR}/Host.cs
         ${CMAKE_CURRENT_BINARY_DIR}/Main.cs
         ${CMAKE_CURRENT_BINARY_DIR}/Module.cs
         ${CMAKE_CURRENT_BINARY_DIR}/ModulePINVOKE.cs
+        ${CMAKE_CURRENT_BINARY_DIR}/StdVectorString.cs
     )
     set_source_files_properties(${Source} PROPERTIES
         GENERATED 1

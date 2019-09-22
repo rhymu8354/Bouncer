@@ -6,6 +6,8 @@ cmake_minimum_required(VERSION 3.8)
 set(This Bouncer)
 
 set(Headers
+    include/Bouncer/Configuration.hpp
+    include/Bouncer/Host.hpp
     include/Bouncer/Main.hpp
 )
 

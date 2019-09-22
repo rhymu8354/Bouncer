@@ -19,11 +19,15 @@ if(MSVC)
         App.xaml
         App.xaml.cs
         EventArgs.cs
+        ObservableStdVector.cs
+        Model/Configuration.cs
         Model/Main.cs
         Properties/AssemblyInfo.cs
         Properties/Resources.resx
         Properties/Resources.Designer.cs
         View/Commands.cs
+        View/ConfigurationWindow.xaml
+        View/ConfigurationWindow.xaml.cs
         View/MainWindow.xaml
         View/MainWindow.xaml.cs
     )

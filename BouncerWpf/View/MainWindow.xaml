@@ -8,6 +8,7 @@
         Title="Bouncer" Height="600" Width="1250"
         Closed="OnClosed">
     <Window.CommandBindings>
+        <CommandBinding Command="local:Commands.Configure" Executed="OnConfigure" />
         <CommandBinding Command="local:Commands.Exit" Executed="OnExit" />
     </Window.CommandBindings>
     <Grid>
@@ -17,6 +18,8 @@
         </Grid.RowDefinitions>
         <Menu Grid.Row="0">
             <MenuItem Header="_File" Width="50">
+                <MenuItem Header="_Configuration" Command="local:Commands.Configure" />
+                <Separator />
                 <MenuItem Header="E_xit" ToolTip="Close the Application" Command="local:Commands.Exit" InputGestureText="Alt+F4" />
             </MenuItem>
         </Menu>

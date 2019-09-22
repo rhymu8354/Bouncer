@@ -38,6 +38,12 @@ namespace Bouncer.Wpf.View {
             Model = null;
         }
 
+        private void OnConfigure(object sender, ExecutedRoutedEventArgs e) {
+            ConfigurationWindow configurationWindow = new ConfigurationWindow();
+            configurationWindow.Model = Model;
+            configurationWindow.ShowDialog();
+        }
+
         private void OnExit(object sender, ExecutedRoutedEventArgs e) {
             Close();
         }

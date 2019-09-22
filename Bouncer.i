@@ -10,6 +10,8 @@
 %module(directors="1") Module
 
 %{
+#include <Bouncer/Configuration.hpp>
+#include <Bouncer/Host.hpp>
 #include <Bouncer/Main.hpp>
 %}
 
@@ -20,7 +22,15 @@
 %include <std_vector.i>
 %include <typemaps.i>
 
+%shared_ptr(Bouncer::Host)
+
 // Ignore move operators because SWIG doesn't support them.
 %ignore Bouncer::Main::operator=(Main&&);
 
+%feature("director") Bouncer::Host;
+
+%include "Bouncer/include/Bouncer/Configuration.hpp"
+%include "Bouncer/include/Bouncer/Host.hpp"
 %include "Bouncer/include/Bouncer/Main.hpp"
+
+%template(StdVectorString) std::vector< std::string >;

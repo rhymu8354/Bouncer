@@ -10,6 +10,21 @@ using System.Windows;
 
 namespace Bouncer.Wpf.Model {
     public class Main: INotifyPropertyChanged, IDisposable {
+
+        #region Types
+
+        private class Host: Bouncer.Host {
+            public Host(Main main) {
+                main_ = main;
+            }
+
+            public override int Foo() => 42;
+
+            private readonly Main main_;
+        }
+
+        #endregion
+
         #region Public Properties
 
         private string status_;
@@ -30,7 +45,7 @@ namespace Bouncer.Wpf.Model {
             get {
                 return native_;
             }
-            set {
+            private set {
                 if (Native != value) {
                     if (Native != null) {
                         Native.Dispose();
@@ -46,6 +61,8 @@ namespace Bouncer.Wpf.Model {
 
         public Main() {
             Native = new Bouncer.Main();
+            HostFacet = new Host(this);
+            Native.SetHost(HostFacet);
         }
 
         #endregion
@@ -70,6 +87,7 @@ namespace Bouncer.Wpf.Model {
             if (!Disposed) {
                 if (disposing) {
                     Native = null;
+                    HostFacet = null;
                 }
                 Disposed = true;
             }
@@ -87,15 +105,8 @@ namespace Bouncer.Wpf.Model {
 
         #region Private Properties
 
-        private bool disposed_ = false;
-        private bool Disposed {
-            get {
-                return disposed_;
-            }
-            set {
-                disposed_ = value;
-            }
-        }
+        private bool Disposed { get; set; } = false;
+        private Host HostFacet { get; set; }
 
         #endregion
     }

@@ -8,10 +8,16 @@
  * © 2019 by Richard Walters
  */
 
+#include <Bouncer/Configuration.hpp>
+#include <Bouncer/Host.hpp>
 #include <memory>
 
 namespace Bouncer {
 
+    /**
+     * This represents the overall application and its interface
+     * to the framework hosting it.
+     */
     class Main {
         // Lifecycle management
     public:
@@ -27,6 +33,18 @@ namespace Bouncer {
          * This is the default constructor.
          */
         Main();
+
+        /**
+         * Associate the application with the framework hosting it.
+         *
+         * @param[in] host
+         *     This is the interface to the framework hosting the application.
+         */
+        void SetHost(std::shared_ptr< Host > host);
+
+        Configuration GetConfiguration();
+
+        void SetConfiguration(const Configuration& configuration);
 
         // Private properties
     private:
