@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -26,7 +26,7 @@ namespace Bouncer.Wpf.View {
 
         public MainWindow() {
             InitializeComponent();
-            Model = new Model.Main();
+            Model = new Model.Main(Dispatcher);
             DataContext = Model;
         }
 

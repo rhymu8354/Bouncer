@@ -22,12 +22,15 @@ if(MSVC)
         ObservableStdVector.cs
         Model/Configuration.cs
         Model/Main.cs
+        Model/Message.cs
         Properties/AssemblyInfo.cs
         Properties/Resources.resx
         Properties/Resources.Designer.cs
         View/Commands.cs
         View/ConfigurationWindow.xaml
         View/ConfigurationWindow.xaml.cs
+        View/FindDescendant.cs
+        View/ListBoxExtensions.cs
         View/MainWindow.xaml
         View/MainWindow.xaml.cs
     )
@@ -77,6 +80,9 @@ if(MSVC)
     )
     add_custom_command(TARGET ${This} POST_BUILD
         COMMAND if EXIST $<TARGET_PDB_FILE:BouncerNative> ${CMAKE_COMMAND} -E copy $<TARGET_PDB_FILE:BouncerNative> $<TARGET_FILE_DIR:${This}>
+    )
+    add_custom_command(TARGET ${This} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_PROPERTY:tls,SOURCE_DIR>/../apps/openssl/cert.pem $<TARGET_FILE_DIR:${This}>
     )
 
 endif(MSVC)

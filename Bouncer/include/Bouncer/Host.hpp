@@ -8,7 +8,7 @@
  * © 2019 by Richard Walters
  */
 
-#include <memory>
+#include <string>
 
 namespace Bouncer {
 
@@ -18,7 +18,10 @@ namespace Bouncer {
      */
     class Host {
     public:
-        virtual int Foo() = 0;
+        virtual void StatusMessage(
+            size_t level,
+            const std::string& message
+        ) = 0;
     };
 
 }

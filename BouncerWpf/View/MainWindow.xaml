@@ -23,7 +23,25 @@
                 <MenuItem Header="E_xit" ToolTip="Close the Application" Command="local:Commands.Exit" InputGestureText="Alt+F4" />
             </MenuItem>
         </Menu>
-        <Grid Grid.Row="1">
-        </Grid>
+        <ListBox
+            Grid.Row="1"
+            ItemsSource="{Binding Messages}"
+            Grid.IsSharedSizeScope="True"
+            local:ListBoxExtensions.AutoScroll="True"
+        >
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="auto" SharedSizeGroup="Level" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{Binding Level}" />
+                        <TextBlock Grid.Column="2" Text="{Binding Content}" />
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
     </Grid>
 </Window>

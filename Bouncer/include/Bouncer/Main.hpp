@@ -35,12 +35,12 @@ namespace Bouncer {
         Main();
 
         /**
-         * Associate the application with the framework hosting it.
+         * Begin the background processing of the application.
          *
          * @param[in] host
          *     This is the interface to the framework hosting the application.
          */
-        void SetHost(std::shared_ptr< Host > host);
+        void Start(std::shared_ptr< Host > host);
 
         Configuration GetConfiguration();
 
@@ -58,7 +58,7 @@ namespace Bouncer {
         /**
          * This contains the private properties of the instance.
          */
-        std::unique_ptr< Impl > impl_;
+        std::shared_ptr< Impl > impl_;
     };
 
 }
