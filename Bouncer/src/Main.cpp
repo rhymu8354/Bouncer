@@ -13,9 +13,14 @@
 #include <condition_variable>
 #include <functional>
 #include <future>
+#include <inttypes.h>
 #include <Json/Value.hpp>
+#include <map>
+#include <math.h>
 #include <memory>
 #include <mutex>
+#include <stdio.h>
+#include <stdint.h>
 #include <string>
 #include <thread>
 #include <Twitch/Messaging.hpp>
@@ -27,6 +32,8 @@
 namespace {
 
     const auto configurationFilePath = SystemAbstractions::File::GetExeParentDirectory() + "/Bouncer.json";
+    constexpr double twitchApiLookupCooldown = 1.0;
+    constexpr size_t maxTwitchUserLookupsByLogin = 100;
 
     template< typename T > void WithoutLock(
         T& lock,
@@ -299,17 +306,42 @@ namespace Bouncer {
 
         };
 
+        struct User {
+            std::string login;
+            std::string name;
+            double accountAge = 0.0;
+            double totalViewTime = 0.0;
+            double joinTime = 0.0;
+            double partTime = 0.0;
+            double lastMessageTime = 0.0;
+            size_t numMessages = 0;
+            double timeout = 0.0;
+            bool isBanned = false;
+            bool isJoined = false;
+        };
+
         // Properties
 
+        bool apiCallInProgress = false;
+        AsyncData::MultiProducerSingleConsumerQueue< std::function< void() > > apiCalls;
         Configuration configuration;
         bool configurationChanged = false;
+        std::mutex diagnosticsMutex;
         SystemAbstractions::DiagnosticsSender diagnosticsSender;
+        std::thread diagnosticsWorker;
         std::shared_ptr< Host > host;
         std::promise< void > loggedOut;
         std::recursive_mutex mutex;
+        double nextApiCallTime = 0.0;
         State state = State::Unconfigured;
         AsyncData::MultiProducerSingleConsumerQueue< StatusMessage > statusMessages;
+        bool stopDiagnosticsWorker = false;
         bool stopWorker = false;
+        std::map< std::string, intmax_t > userIdsByLogin;
+        std::map< std::string, double > userJoinsByLogin;
+        AsyncData::MultiProducerSingleConsumerQueue< std::string > userLookupsByLogin;
+        std::map< intmax_t, User > usersById;
+        std::condition_variable wakeDiagnosticsWorker;
         std::condition_variable_any wakeWorker;
         std::thread worker;
 
@@ -344,9 +376,9 @@ namespace Bouncer {
                     StatusMessage statusMessage;
                     statusMessage.level = level;
                     statusMessage.message = message;
-                    std::lock_guard< decltype(mutex) > lock(mutex);
+                    std::lock_guard< decltype(diagnosticsMutex) > lock(diagnosticsMutex);
                     statusMessages.Add(std::move(statusMessage));
-                    wakeWorker.notify_one();
+                    wakeDiagnosticsWorker.notify_one();
                 }
             );
         }
@@ -354,6 +386,21 @@ namespace Bouncer {
         void AwaitLogOut() {
             auto wasLoggedOut = loggedOut.get_future();
             (void)wasLoggedOut.wait_for(std::chrono::seconds(1));
+        }
+
+        void DiagnosticsWorker() {
+            std::unique_lock< decltype(diagnosticsMutex) > lock(diagnosticsMutex);
+            while (!stopDiagnosticsWorker) {
+                WithoutLock(lock, [&]{ PublishMessages(); });
+                const auto workerWakeCondition = [this]{
+                    return (
+                        stopDiagnosticsWorker
+                        || !statusMessages.IsEmpty()
+                    );
+                };
+                wakeDiagnosticsWorker.wait(lock, workerWakeCondition);
+            }
+            WithoutLock(lock, [&]{ PublishMessages(); });
         }
 
         void LoadConfiguration() {
@@ -430,6 +477,22 @@ namespace Bouncer {
             }
         }
 
+        void NextApiCall() {
+            if (apiCalls.IsEmpty()) {
+                nextApiCallTime = 0.0;
+            } else {
+                const auto apiCall = apiCalls.Remove();
+                apiCall();
+                nextApiCallTime = twitchTimeKeeper->GetCurrentTime() + twitchApiLookupCooldown;
+            }
+        }
+
+        void NotifyStopDiagnosticsWorker() {
+            std::lock_guard< decltype(diagnosticsMutex) > lock(diagnosticsMutex);
+            stopDiagnosticsWorker = true;
+            wakeDiagnosticsWorker.notify_one();
+        }
+
         void NotifyStopWorker() {
             std::lock_guard< decltype(mutex) > lock(mutex);
             stopWorker = true;
@@ -464,10 +527,48 @@ namespace Bouncer {
             if (membershipInfo.user == configuration.account) {
                 PostStatus("Joined room");
                 state = State::InsideRoom;
-                tmi.SendMessage(
-                    configuration.channel,
-                    "Hello, World!"
-                );
+                //tmi.SendMessage(
+                //    configuration.channel,
+                //    "Hello, World!"
+                //);
+            } else {
+                auto userIdsByLoginEntry = userIdsByLogin.find(membershipInfo.user);
+                if (userIdsByLoginEntry == userIdsByLogin.end()) {
+                    userJoinsByLogin[membershipInfo.user] = twitchTimeKeeper->GetCurrentTime();
+                    const auto noUserLookupsWerePending = userLookupsByLogin.IsEmpty();
+                    userLookupsByLogin.Add(membershipInfo.user);
+                    if (noUserLookupsWerePending) {
+                        PostApiCall(
+                            [
+                                this
+                            ]{
+                                size_t logins = 0;
+                                while (
+                                    !userLookupsByLogin.IsEmpty()
+                                    && (logins < maxTwitchUserLookupsByLogin)
+                                ) {
+                                    ++logins;
+                                    const auto login = userLookupsByLogin.Remove();
+                                    diagnosticsSender.SendDiagnosticInformationFormatted(
+                                        2,
+                                        "Would have looked up Twitch user by login (%s)",
+                                        login.c_str()
+                                    );
+                                    // TODO: Queue Join once Twitch user ID is known
+                                }
+                            }
+                        );
+                    }
+                } else {
+                    const auto userid = userIdsByLoginEntry->second;
+                    auto& user = usersById[userid];
+                    if (!user.isJoined) {
+                        UserJoined(
+                            userid,
+                            twitchTimeKeeper->GetCurrentTime()
+                        );
+                    }
+                }
             }
         }
 
@@ -476,6 +577,26 @@ namespace Bouncer {
             if (membershipInfo.user == configuration.account) {
                 PostStatus("Left room");
                 state = State::OutsideRoom;
+            } else {
+                auto userIdsByLoginEntry = userIdsByLogin.find(membershipInfo.user);
+                if (userIdsByLoginEntry != userIdsByLogin.end()) {
+                    const auto userid = userIdsByLoginEntry->second;
+                    auto& user = usersById[userid];
+                    if (user.isJoined) {
+                        UserParted(
+                            userid,
+                            twitchTimeKeeper->GetCurrentTime()
+                        );
+                    }
+                }
+            }
+        }
+
+        void PostApiCall(std::function< void() > apiCall) {
+            const auto apiCallsWasEmpty = apiCalls.IsEmpty();
+            apiCalls.Add(apiCall);
+            if (apiCallsWasEmpty) {
+                wakeWorker.notify_one();
             }
         }
 
@@ -517,6 +638,15 @@ namespace Bouncer {
             );
         }
 
+        void StartDiagnosticsWorker() {
+            if (diagnosticsWorker.joinable()) {
+                return;
+            }
+            std::lock_guard< decltype(diagnosticsMutex) > lock(diagnosticsMutex);
+            stopDiagnosticsWorker = false;
+            diagnosticsWorker = std::thread(&Impl::DiagnosticsWorker, this);
+        }
+
         void StartWorker() {
             if (worker.joinable()) {
                 return;
@@ -526,12 +656,49 @@ namespace Bouncer {
             worker = std::thread(&Impl::Worker, this);
         }
 
+        void StopDiagnosticsWorker() {
+            if (!diagnosticsWorker.joinable()) {
+                return;
+            }
+            NotifyStopDiagnosticsWorker();
+            diagnosticsWorker.join();
+        }
+
         void StopWorker() {
             if (!worker.joinable()) {
                 return;
             }
             NotifyStopWorker();
             worker.join();
+        }
+
+        void UserParted(
+            intmax_t userid,
+            double partTime
+        ) {
+            auto& user = usersById[userid];
+            user.isJoined = false;
+            user.partTime = partTime;
+            diagnosticsSender.SendDiagnosticInformationFormatted(
+                2,
+                "User %" PRIdMAX " (%s) has parted",
+                userid,
+                user.login.c_str()
+            );
+        }
+        void UserJoined(
+            intmax_t userid,
+            double joinTime
+        ) {
+            auto& user = usersById[userid];
+            user.isJoined = true;
+            user.joinTime = joinTime;
+            diagnosticsSender.SendDiagnosticInformationFormatted(
+                2,
+                "User %" PRIdMAX " (%s) has joined",
+                userid,
+                user.login.c_str()
+            );
         }
 
         void Worker() {
@@ -545,7 +712,6 @@ namespace Bouncer {
                 WithoutLock(lock, [&]{ AwaitLogOut(); });
             }
             PostStatus("Stopped");
-            WithoutLock(lock, [&]{ PublishMessages(); });
         }
 
         void WorkerBody(std::unique_lock< decltype(mutex) >& lock) {
@@ -576,17 +742,35 @@ namespace Bouncer {
                     configurationChanged = false;
                     HandleConfigurationChanged();
                 }
-                WithoutLock(lock, [&]{ PublishMessages(); });
-                wakeWorker.wait(
-                    lock,
-                    [this]{
-                        return (
-                            stopWorker
-                            || !statusMessages.IsEmpty()
-                            || configurationChanged
-                        );
-                    }
-                );
+                const auto now = twitchTimeKeeper->GetCurrentTime();
+                if (
+                    !apiCallInProgress
+                    && (now >= nextApiCallTime)
+                ) {
+                    NextApiCall();
+                }
+                const auto workerWakeCondition = [this]{
+                    return (
+                        stopWorker
+                        || (
+                            !apiCalls.IsEmpty()
+                            && (twitchTimeKeeper->GetCurrentTime() >= nextApiCallTime)
+                        )
+                        || configurationChanged
+                    );
+                };
+                if (nextApiCallTime == 0.0) {
+                    wakeWorker.wait(lock, workerWakeCondition);
+                } else if (
+                    (now < nextApiCallTime)
+                    && !workerWakeCondition()
+                ) {
+                    const auto nowClock = std::chrono::system_clock::now();
+                    wakeWorker.wait_until(
+                        lock,
+                        nowClock + std::chrono::milliseconds((int)ceil((nextApiCallTime - now) * 1000.0))
+                    );
+                }
             }
         }
     };
@@ -594,7 +778,7 @@ namespace Bouncer {
     Main::~Main() noexcept {
         impl_->PostStatus("Stopping");
         impl_->StopWorker();
-        impl_->PublishMessages();
+        impl_->StopDiagnosticsWorker();
     }
     Main::Main(Main&&) noexcept = default;
     Main& Main::operator=(Main&&) noexcept = default;
@@ -608,6 +792,7 @@ namespace Bouncer {
     void Main::Start(std::shared_ptr< Host > host) {
         impl_->host = host;
         impl_->PostStatus("Starting");
+        impl_->StartDiagnosticsWorker();
         impl_->StartWorker();
     }
 
