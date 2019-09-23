@@ -48,6 +48,16 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public string ClientId {
+            get {
+                return Adaptee.clientId;
+            }
+            set {
+                Adaptee.clientId = value;
+                NotifyPropertyChanged("ClientId");
+            }
+        }
+
         public string Channel {
             get {
                 return Adaptee.channel;

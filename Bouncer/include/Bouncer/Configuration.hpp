@@ -20,6 +20,7 @@ namespace Bouncer {
     struct Configuration {
         std::string account;
         std::string token;
+        std::string clientId;
         std::string channel;
         double newAccountAgeThreshold = 0.0;
         std::vector< std::string > whitelist;

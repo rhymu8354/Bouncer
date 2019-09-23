@@ -378,6 +378,7 @@ namespace Bouncer {
             }
             configuration.account = (std::string)json["account"];
             configuration.token = (std::string)json["token"];
+            configuration.clientId = (std::string)json["clientId"];
             configuration.channel = (std::string)json["channel"];
             configuration.newAccountAgeThreshold = (double)json["newAccountAgeThreshold"];
             const auto& whitelist = json["whitelist"];
@@ -404,6 +405,7 @@ namespace Bouncer {
             const bool isConfigured = (
                 !configuration.account.empty()
                 && !configuration.token.empty()
+                && !configuration.clientId.empty()
                 && !configuration.channel.empty()
             );
             if (isConfigured) {
@@ -495,6 +497,7 @@ namespace Bouncer {
             auto json = Json::Object({
                 {"account", configuration.account},
                 {"token", configuration.token},
+                {"clientId", configuration.clientId},
                 {"channel", configuration.channel},
                 {"newAccountAgeThreshold", configuration.newAccountAgeThreshold},
                 {"whitelist", Json::Array({})},
