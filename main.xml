@@ -2,6 +2,11 @@
 <workspace>
     <repositories>
         <repository
+            path="AsyncData"
+            url="git@github.com:rhymu8354/AsyncData.git"
+            branch="master"
+            />
+        <repository
             path="Base64"
             url="git@github.com:rhymu8354/Base64.git"
             branch="master"

@@ -102,6 +102,7 @@ if(ParentDirectory STREQUAL "")
     endforeach()
 
     # All other libraries can be pulled in without further configuration.
+    add_subdirectory(AsyncData)
     add_subdirectory(Base64)
     add_subdirectory(Http)
     add_subdirectory(HttpNetworkTransport)
@@ -117,9 +118,8 @@ if(ParentDirectory STREQUAL "")
 endif(ParentDirectory STREQUAL "")
 
 # Add subdirectories directly in this repository.
-
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-
 add_subdirectory(Bouncer)
 add_subdirectory(BouncerNet)
 add_subdirectory(BouncerWpf)
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
