@@ -8,6 +8,7 @@
 
 #include "TimeKeeper.hpp"
 
+#include <algorithm>
 #include <AsyncData/MultiProducerSingleConsumerQueue.hpp>
 #include <Bouncer/Main.hpp>
 #include <condition_variable>
@@ -21,6 +22,7 @@
 #include <math.h>
 #include <memory>
 #include <mutex>
+#include <queue>
 #include <stdio.h>
 #include <stdint.h>
 #include <string>
@@ -229,6 +231,11 @@ namespace Bouncer {
     struct Main::Impl {
         // Types
 
+        struct MessageAwaitingProcessing {
+            Twitch::Messaging::MessageInfo messageInfo;
+            double messageTime = 0.0;
+        };
+
         enum class State {
             Unconfigured,
             Unconnected,
@@ -299,6 +306,7 @@ namespace Bouncer {
                 if (impl == nullptr) {
                     return;
                 }
+                impl->OnMessage(std::move(messageInfo));
             }
 
             virtual void PrivateMessage(Twitch::Messaging::MessageInfo&& messageInfo) override {
@@ -412,6 +420,7 @@ namespace Bouncer {
         std::map< int, std::shared_ptr< Http::IClient::Transaction > > httpClientTransactions;
 
         std::promise< void > loggedOut;
+        std::map< intmax_t, std::queue< MessageAwaitingProcessing > > messagesAwaitingProcessing;
         std::recursive_mutex mutex;
         double nextApiCallTime = 0.0;
         double nextConfigurationAutoSaveTime = 0.0;
@@ -597,6 +606,152 @@ namespace Bouncer {
             }
         }
 
+        void HandleMessage(
+            const Twitch::Messaging::MessageInfo&& messageInfo,
+            double messageTime
+        ) {
+            const auto userid = messageInfo.tags.userId;
+            if (userid != 0) {
+                auto usersByIdEntry = usersById.find(userid);
+                if (usersByIdEntry == usersById.end()) {
+                    auto& messagesAwaitingProcessingForUser = messagesAwaitingProcessing[userid];
+                    const auto noMessagesWereAlreadyAwaitingProcessing = messagesAwaitingProcessingForUser.empty();
+                    MessageAwaitingProcessing messageAwaitingProcessing;
+                    messageAwaitingProcessing.messageInfo = std::move(messageInfo);
+                    messageAwaitingProcessing.messageTime = messageTime;
+                    messagesAwaitingProcessingForUser.push(std::move(messageAwaitingProcessing));
+                    if (noMessagesWereAlreadyAwaitingProcessing) {
+                        LookupUserById(
+                            userid,
+                            [userid](Impl& impl){
+                                auto& messagesAwaitingProcessingForUser = impl.messagesAwaitingProcessing[userid];
+                                while (!messagesAwaitingProcessingForUser.empty()) {
+                                    auto& messageAwaitingProcessing = messagesAwaitingProcessingForUser.front();
+                                    impl.HandleMessage(
+                                        std::move(messageAwaitingProcessing.messageInfo),
+                                        messageAwaitingProcessing.messageTime
+                                    );
+                                    messagesAwaitingProcessingForUser.pop();
+                                }
+                                impl.messagesAwaitingProcessing.erase(userid);
+                            }
+                        );
+                    }
+                } else {
+                    auto& user = usersByIdEntry->second;
+                    if (user.login != messageInfo.user) {
+                        if (!user.login.empty()) {
+                            diagnosticsSender.SendDiagnosticInformationFormatted(
+                                3,
+                                "Twitch user %" PRIdMAX " login changed from %s to %s",
+                                userid,
+                                user.login.c_str(),
+                                messageInfo.user.c_str()
+                            );
+                            (void)userIdsByLogin.erase(user.login);
+                        }
+                        user.login = messageInfo.user;
+                    }
+                    if (user.name != messageInfo.tags.displayName) {
+                        if (!user.name.empty()) {
+                            diagnosticsSender.SendDiagnosticInformationFormatted(
+                                3,
+                                "Twitch user %" PRIdMAX " display name changed from %s to %s",
+                                userid,
+                                user.name.c_str(),
+                                messageInfo.tags.displayName.c_str()
+                            );
+                        }
+                        user.name = messageInfo.tags.displayName;
+                    }
+                    user.lastMessageTime = messageTime;
+                    ++user.numMessages;
+                    diagnosticsSender.SendDiagnosticInformationFormatted(
+                        3,
+                        "Twitch user %" PRIdMAX " (%s) sent message #%zu at %lf",
+                        userid,
+                        user.login.c_str(),
+                        user.numMessages,
+                        user.lastMessageTime
+                    );
+                    if (!user.isJoined) {
+                        UserJoined(userid, messageTime);
+                    }
+                }
+            }
+        }
+
+        void LookupUserById(
+            intmax_t userid,
+            std::function< void(Impl& impl) > after
+        ) {
+            const auto targetUriString = SystemAbstractions::sprintf(
+                "https://api.twitch.tv/kraken/users/%" PRIdMAX,
+                userid
+            );
+            PostApiCall(
+                targetUriString,
+                [
+                    after,
+                    userid
+                ](
+                    Impl& impl,
+                    int id,
+                    const Http::IClient::Transaction& transaction
+                ){
+                    if (transaction.response.statusCode == 200) {
+                        const auto userEncoded = Json::Value::FromEncoding(transaction.response.body);
+                        const auto login = (std::string)userEncoded["name"];
+                        if (login.empty()) {
+                            impl.diagnosticsSender.SendDiagnosticInformationFormatted(
+                                SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                                "Twitch API call %d returned user with missing login",
+                                id
+                            );
+                            return;
+                        }
+                        impl.userIdsByLogin[login] = userid;
+                        auto& user = impl.usersById[userid];
+                        if (user.login != login) {
+                            if (!user.login.empty()) {
+                                impl.diagnosticsSender.SendDiagnosticInformationFormatted(
+                                    3,
+                                    "Twitch user %" PRIdMAX " login changed from %s to %s",
+                                    userid,
+                                    user.login.c_str(),
+                                    login.c_str()
+                                );
+                                (void)impl.userIdsByLogin.erase(user.login);
+                            }
+                            user.login = login;
+                        }
+                        const auto name = (std::string)userEncoded["display_name"];
+                        if (user.name != name) {
+                            if (!user.name.empty()) {
+                                impl.diagnosticsSender.SendDiagnosticInformationFormatted(
+                                    3,
+                                    "Twitch user %" PRIdMAX " display name changed from %s to %s",
+                                    userid,
+                                    user.name.c_str(),
+                                    name.c_str()
+                                );
+                            }
+                            user.name = name;
+                        }
+                        user.createdAt = ParseTimestamp((std::string)userEncoded["created_at"]);
+                        after(impl);
+                    } else {
+                        impl.diagnosticsSender.SendDiagnosticInformationFormatted(
+                            SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                            "Twitch API call %d returned code %d",
+                            id,
+                            transaction.response.statusCode
+                        );
+                    }
+                }
+            );
+        }
+
         void NextApiCall() {
             if (apiCalls.IsEmpty()) {
                 nextApiCallTime = 0.0;
@@ -661,7 +816,7 @@ namespace Bouncer {
                 PostStatus("Left room");
                 state = State::OutsideRoom;
             } else {
-                auto userIdsByLoginEntry = userIdsByLogin.find(membershipInfo.user);
+                const auto userIdsByLoginEntry = userIdsByLogin.find(membershipInfo.user);
                 if (userIdsByLoginEntry != userIdsByLogin.end()) {
                     const auto userid = userIdsByLoginEntry->second;
                     auto& user = usersById[userid];
@@ -673,6 +828,11 @@ namespace Bouncer {
                     }
                 }
             }
+        }
+
+        void OnMessage(Twitch::Messaging::MessageInfo&& messageInfo) {
+            std::lock_guard< decltype(mutex) > lock(mutex);
+            HandleMessage(std::move(messageInfo), timeKeeper->GetCurrentTime());
         }
 
         void OnNameList(Twitch::Messaging::NameListInfo&& nameListInfo) {
@@ -856,6 +1016,9 @@ namespace Bouncer {
             double partTime
         ) {
             auto& user = usersById[userid];
+            if (user.isJoined) {
+                user.totalViewTime += (partTime - user.joinTime);
+            }
             user.isJoined = false;
             user.partTime = partTime;
             diagnosticsSender.SendDiagnosticInformationFormatted(
@@ -1107,6 +1270,13 @@ namespace Bouncer {
                         lock,
                         nowClock + std::chrono::milliseconds(timeoutMilliseconds)
                     );
+                }
+            }
+            auto now = timeKeeper->GetCurrentTime();
+            for (auto& usersByIdEntry: usersById) {
+                auto& user = usersByIdEntry.second;
+                if (user.isJoined) {
+                    user.totalViewTime += (now - user.joinTime);
                 }
             }
             SaveConfiguration();
