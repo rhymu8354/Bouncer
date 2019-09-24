@@ -13,6 +13,8 @@
 #include <condition_variable>
 #include <functional>
 #include <future>
+#include <Http/Client.hpp>
+#include <HttpNetworkTransport/HttpClientNetworkTransport.hpp>
 #include <inttypes.h>
 #include <Json/Value.hpp>
 #include <map>
@@ -23,10 +25,12 @@
 #include <stdint.h>
 #include <string>
 #include <thread>
+#include <TlsDecorator/TlsDecorator.hpp>
 #include <Twitch/Messaging.hpp>
 #include <TwitchNetworkTransport/Connection.hpp>
 #include <SystemAbstractions/DiagnosticsSender.hpp>
 #include <SystemAbstractions/File.hpp>
+#include <SystemAbstractions/NetworkConnection.hpp>
 #include <SystemAbstractions/StringExtensions.hpp>
 
 namespace {
@@ -96,6 +100,56 @@ namespace {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Convert the given time in UTC to the equivalent number of seconds
+     * since the UNIX epoch (Midnight UTC January 1, 1970).
+     *
+     * @param[in] timestamp
+     *     This is the timestamp to convert.
+     *
+     * @return
+     *     The equivalent timetamp in seconds since the UNIX epoch
+     *     is returned.
+     */
+    double ParseTimestamp(const std::string& timestamp) {
+        int years, months, days, hours, minutes, seconds;
+        (void)sscanf(
+            timestamp.c_str(),
+            "%d-%d-%dT%d:%d:%dZ",
+            &years,
+            &months,
+            &days,
+            &hours,
+            &minutes,
+            &seconds
+        );
+        static const auto isLeapYear = [](int year){
+            if ((year % 4) != 0) { return false; }
+            if ((year % 100) != 0) { return true; }
+            return ((year % 400) == 0);
+        };
+        auto total = (intmax_t)seconds;
+        for (int yy = 1970; yy < years; ++yy) {
+            total += (isLeapYear(yy) ? 366 : 365) * 86400;
+        }
+        static const int daysPerMonth[] = {
+            31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
+        };
+        for (int mm = 1; mm < months; ++mm) {
+            total += daysPerMonth[mm - 1] * 86400;
+            if (
+                (mm == 2)
+                && isLeapYear(years)
+            ) {
+                total += 86400;
+            }
+        }
+        total += (days - 1) * 86400;
+        total += hours * 3600;
+        total += minutes * 60;
+        return (double)total;
     }
 
     /**
@@ -309,7 +363,7 @@ namespace Bouncer {
         struct User {
             std::string login;
             std::string name;
-            double accountAge = 0.0;
+            double createdAt = 0.0;
             double totalViewTime = 0.0;
             double joinTime = 0.0;
             double partTime = 0.0;
@@ -330,9 +384,27 @@ namespace Bouncer {
         SystemAbstractions::DiagnosticsSender diagnosticsSender;
         std::thread diagnosticsWorker;
         std::shared_ptr< Host > host;
+        std::shared_ptr< Http::Client > httpClient = std::make_shared< Http::Client >();
+
+        /**
+         * This holds onto pending HTTP request transactions being made.
+         *
+         * The keys are unique identifiers.  The values are the transactions.
+         */
+        std::map< int, std::shared_ptr< Http::IClient::Transaction > > httpClientTransactions;
+
         std::promise< void > loggedOut;
         std::recursive_mutex mutex;
         double nextApiCallTime = 0.0;
+
+        /**
+         * This is used to select unique identifiers as keys for the
+         * httpClientTransactions collection.  It is incremented each
+         * time a key is selected.
+         */
+        int nextHttpClientTransactionId = 1;
+
+        std::weak_ptr< Impl > selfWeak;
         State state = State::Unconfigured;
         AsyncData::MultiProducerSingleConsumerQueue< StatusMessage > statusMessages;
         bool stopDiagnosticsWorker = false;
@@ -340,10 +412,12 @@ namespace Bouncer {
         std::map< std::string, intmax_t > userIdsByLogin;
         std::map< std::string, double > userJoinsByLogin;
         AsyncData::MultiProducerSingleConsumerQueue< std::string > userLookupsByLogin;
+        bool userLookupsPending = false;
         std::map< intmax_t, User > usersById;
         std::condition_variable wakeDiagnosticsWorker;
         std::condition_variable_any wakeWorker;
         std::thread worker;
+
 
         /**
          * This is used to interact with Twitch.
@@ -360,7 +434,7 @@ namespace Bouncer {
         /**
          * This is used to track time for the Twitch interface.
          */
-        std::shared_ptr< TimeKeeper > twitchTimeKeeper = std::make_shared< TimeKeeper >();
+        std::shared_ptr< TimeKeeper > timeKeeper = std::make_shared< TimeKeeper >();
 
         // Methods
 
@@ -483,7 +557,6 @@ namespace Bouncer {
             } else {
                 const auto apiCall = apiCalls.Remove();
                 apiCall();
-                nextApiCallTime = twitchTimeKeeper->GetCurrentTime() + twitchApiLookupCooldown;
             }
         }
 
@@ -532,43 +605,7 @@ namespace Bouncer {
                 //    "Hello, World!"
                 //);
             } else {
-                auto userIdsByLoginEntry = userIdsByLogin.find(membershipInfo.user);
-                if (userIdsByLoginEntry == userIdsByLogin.end()) {
-                    userJoinsByLogin[membershipInfo.user] = twitchTimeKeeper->GetCurrentTime();
-                    const auto noUserLookupsWerePending = userLookupsByLogin.IsEmpty();
-                    userLookupsByLogin.Add(membershipInfo.user);
-                    if (noUserLookupsWerePending) {
-                        PostApiCall(
-                            [
-                                this
-                            ]{
-                                size_t logins = 0;
-                                while (
-                                    !userLookupsByLogin.IsEmpty()
-                                    && (logins < maxTwitchUserLookupsByLogin)
-                                ) {
-                                    ++logins;
-                                    const auto login = userLookupsByLogin.Remove();
-                                    diagnosticsSender.SendDiagnosticInformationFormatted(
-                                        2,
-                                        "Would have looked up Twitch user by login (%s)",
-                                        login.c_str()
-                                    );
-                                    // TODO: Queue Join once Twitch user ID is known
-                                }
-                            }
-                        );
-                    }
-                } else {
-                    const auto userid = userIdsByLoginEntry->second;
-                    auto& user = usersById[userid];
-                    if (!user.isJoined) {
-                        UserJoined(
-                            userid,
-                            twitchTimeKeeper->GetCurrentTime()
-                        );
-                    }
-                }
+                UsersJoined({std::move(membershipInfo.user)});
             }
         }
 
@@ -585,7 +622,7 @@ namespace Bouncer {
                     if (user.isJoined) {
                         UserParted(
                             userid,
-                            twitchTimeKeeper->GetCurrentTime()
+                            timeKeeper->GetCurrentTime()
                         );
                     }
                 }
@@ -593,11 +630,12 @@ namespace Bouncer {
         }
 
         void PostApiCall(std::function< void() > apiCall) {
-            const auto apiCallsWasEmpty = apiCalls.IsEmpty();
+            diagnosticsSender.SendDiagnosticInformationString(
+                3,
+                "Posting API call"
+            );
             apiCalls.Add(apiCall);
-            if (apiCallsWasEmpty) {
-                wakeWorker.notify_one();
-            }
+            wakeWorker.notify_one();
         }
 
         void PostStatus(const std::string& message) {
@@ -686,6 +724,7 @@ namespace Bouncer {
                 user.login.c_str()
             );
         }
+
         void UserJoined(
             intmax_t userid,
             double joinTime
@@ -695,9 +734,162 @@ namespace Bouncer {
             user.joinTime = joinTime;
             diagnosticsSender.SendDiagnosticInformationFormatted(
                 2,
-                "User %" PRIdMAX " (%s) has joined",
+                "User %" PRIdMAX " (%s) has joined (account age: %lf)",
                 userid,
-                user.login.c_str()
+                user.login.c_str(),
+                timeKeeper->GetCurrentTime() - user.createdAt
+            );
+        }
+
+        void UsersJoined(const std::vector< std::string >& logins) {
+            const auto joinTime = timeKeeper->GetCurrentTime();
+            for (const auto& login: logins) {
+                auto userIdsByLoginEntry = userIdsByLogin.find(login);
+                if (userIdsByLoginEntry == userIdsByLogin.end()) {
+                    userLookupsByLogin.Add(login);
+                    userJoinsByLogin[login] = joinTime;
+                } else {
+                    const auto userid = userIdsByLoginEntry->second;
+                    auto& user = usersById[userid];
+                    if (!user.isJoined) {
+                        UserJoined(userid, joinTime);
+                    }
+                }
+            }
+            if (
+                userLookupsByLogin.IsEmpty()
+                || userLookupsPending
+            ) {
+                return;
+            }
+            PostUserLookupsByLogin();
+        }
+
+        void PostUserLookupsByLogin() {
+            std::set< std::string > logins;
+            while (
+                !userLookupsByLogin.IsEmpty()
+                && (logins.size() < maxTwitchUserLookupsByLogin)
+            ) {
+                (void)logins.insert(userLookupsByLogin.Remove());
+            }
+            userLookupsPending = true;
+            PostApiCall(
+                [
+                    this,
+                    logins
+                ]{
+                    apiCallInProgress = true;
+                    std::string targetAsString = "https://api.twitch.tv/kraken/users?login=";
+                    bool first = true;
+                    for (const auto& login: logins) {
+                        if (first) {
+                            first = false;
+                        } else {
+                            targetAsString += ",";
+                        }
+                        targetAsString += login;
+                    }
+                    const auto id = nextHttpClientTransactionId++;
+                    diagnosticsSender.SendDiagnosticInformationFormatted(
+                        2,
+                        "Twitch API call %d: %s",
+                        id,
+                        targetAsString.c_str()
+                    );
+                    Http::Request request;
+                    request.method = "GET";
+                    request.target.ParseFromString(targetAsString);
+                    request.target.SetPort(443);
+                    request.headers.SetHeader("Client-ID", configuration.clientId);
+                    request.headers.SetHeader("Accept", "application/vnd.twitchtv.v5+json");
+                    auto& httpClientTransaction = httpClientTransactions[id];
+                    httpClientTransaction = httpClient->Request(request);
+                    auto selfWeakCopy(selfWeak);
+                    httpClientTransaction->SetCompletionDelegate(
+                        [
+                            id,
+                            selfWeakCopy
+                        ]{
+                            auto impl = selfWeakCopy.lock();
+                            if (impl == nullptr) {
+                                return;
+                            }
+                            std::lock_guard< decltype(impl->mutex) > lock(impl->mutex);
+                            impl->apiCallInProgress = false;
+                            impl->nextApiCallTime = impl->timeKeeper->GetCurrentTime() + twitchApiLookupCooldown;
+                            impl->wakeWorker.notify_one();
+                            auto httpClientTransactionsEntry = impl->httpClientTransactions.find(id);
+                            if (httpClientTransactionsEntry == impl->httpClientTransactions.end()) {
+                                return;
+                            }
+                            const auto& httpClientTransaction = httpClientTransactionsEntry->second;
+                            if (httpClientTransaction->response.statusCode == 200) {
+                                const auto users = Json::Value::FromEncoding(httpClientTransaction->response.body)["users"];
+                                for (size_t i = 0; i < users.GetSize(); ++i) {
+                                    const auto& userEncoded = users[i];
+                                    intmax_t userid;
+                                    if (
+                                        sscanf(
+                                            ((std::string)userEncoded["_id"]).c_str(), "%" SCNdMAX,
+                                            &userid
+                                        ) != 1
+                                    ) {
+                                        impl->diagnosticsSender.SendDiagnosticInformationFormatted(
+                                            SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                                            "Twitch API call %d returned user %zu with invalid ID",
+                                            id,
+                                            i
+                                        );
+                                        continue;
+                                    }
+                                    const auto login = (std::string)userEncoded["name"];
+                                    if (login.empty()) {
+                                        impl->diagnosticsSender.SendDiagnosticInformationFormatted(
+                                            SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                                            "Twitch API call %d returned user %zu with missing login",
+                                            id,
+                                            i
+                                        );
+                                        continue;
+                                    }
+                                    auto userLookupsByLoginEntry = impl->userJoinsByLogin.find(login);
+                                    if (userLookupsByLoginEntry == impl->userJoinsByLogin.end()) {
+                                        impl->diagnosticsSender.SendDiagnosticInformationFormatted(
+                                            SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                                            "Twitch API call %d returned user %zu with unexpected login (%s)",
+                                            id,
+                                            i,
+                                            login.c_str()
+                                        );
+                                        continue;
+                                    }
+                                    const auto joinTime = userLookupsByLoginEntry->second;
+                                    (void)impl->userJoinsByLogin.erase(userLookupsByLoginEntry);
+                                    impl->userIdsByLogin[login] = userid;
+                                    auto& user = impl->usersById[userid];
+                                    user.login = login;
+                                    user.name = (std::string)userEncoded["display_name"];
+                                    user.createdAt = ParseTimestamp((std::string)userEncoded["created_at"]);
+                                    impl->UserJoined(userid, joinTime);
+                                }
+                            } else {
+                                impl->diagnosticsSender.SendDiagnosticInformationFormatted(
+                                    SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                                    "Twitch API call %d returned code %d",
+                                    id,
+                                    httpClientTransaction->response.statusCode
+                                );
+                            }
+                            (void)impl->httpClientTransactions.erase(httpClientTransactionsEntry);
+                            if (impl->userLookupsByLogin.IsEmpty()) {
+                                impl->userLookupsPending = false;
+                            } else {
+                                impl->PostUserLookupsByLogin();
+                            }
+                        }
+                    );
+                }
             );
         }
 
@@ -722,6 +914,27 @@ namespace Bouncer {
                 return;
             }
             const auto diagnosticsPublisher = diagnosticsSender.Chain();
+            (void)httpClient->SubscribeToDiagnostics(diagnosticsPublisher);
+            Http::Client::MobilizationDependencies httpClientDeps;
+            httpClientDeps.timeKeeper = timeKeeper;
+            const auto transport = std::make_shared< HttpNetworkTransport::HttpClientNetworkTransport >();
+            transport->SubscribeToDiagnostics(diagnosticsPublisher);
+            transport->SetConnectionFactory(
+                [
+                    diagnosticsPublisher,
+                    caCerts
+                ](
+                    const std::string& scheme,
+                    const std::string& serverName
+                ) -> std::shared_ptr< SystemAbstractions::INetworkConnection > {
+                    const auto decorator = std::make_shared< TlsDecorator::TlsDecorator >();
+                    const auto connection = std::make_shared< SystemAbstractions::NetworkConnection >();
+                    decorator->ConfigureAsClient(connection, caCerts, serverName);
+                    return decorator;
+                }
+            );
+            httpClientDeps.transport = transport;
+            httpClient->Mobilize(httpClientDeps);
             tmi.SetConnectionFactory(
                 [
                     caCerts,
@@ -733,8 +946,8 @@ namespace Bouncer {
                     return connection;
                 }
             );
-            tmi.SubscribeToDiagnostics(diagnosticsPublisher);
-            tmi.SetTimeKeeper(twitchTimeKeeper);
+            (void)tmi.SubscribeToDiagnostics(diagnosticsPublisher);
+            tmi.SetTimeKeeper(timeKeeper);
             tmi.SetUser(twitchDelegate);
             PostStatus("Started");
             while (!stopWorker) {
@@ -742,7 +955,7 @@ namespace Bouncer {
                     configurationChanged = false;
                     HandleConfigurationChanged();
                 }
-                const auto now = twitchTimeKeeper->GetCurrentTime();
+                const auto now = timeKeeper->GetCurrentTime();
                 if (
                     !apiCallInProgress
                     && (now >= nextApiCallTime)
@@ -754,21 +967,28 @@ namespace Bouncer {
                         stopWorker
                         || (
                             !apiCalls.IsEmpty()
-                            && (twitchTimeKeeper->GetCurrentTime() >= nextApiCallTime)
+                            && (timeKeeper->GetCurrentTime() >= nextApiCallTime)
                         )
                         || configurationChanged
                     );
                 };
-                if (nextApiCallTime == 0.0) {
-                    wakeWorker.wait(lock, workerWakeCondition);
+                if (
+                    (nextApiCallTime == 0.0)
+                    || apiCallInProgress
+                ) {
+                    wakeWorker.wait(lock);
                 } else if (
                     (now < nextApiCallTime)
                     && !workerWakeCondition()
                 ) {
                     const auto nowClock = std::chrono::system_clock::now();
+                    const auto timeoutMilliseconds = (int)ceil(
+                        (nextApiCallTime - now)
+                        * 1000.0
+                    );
                     wakeWorker.wait_until(
                         lock,
-                        nowClock + std::chrono::milliseconds((int)ceil((nextApiCallTime - now) * 1000.0))
+                        nowClock + std::chrono::milliseconds(timeoutMilliseconds)
                     );
                 }
             }
@@ -786,6 +1006,7 @@ namespace Bouncer {
     Main::Main()
         : impl_(new Impl)
     {
+        impl_->selfWeak = impl_;
         impl_->twitchDelegate->implWeak = impl_;
     }
 

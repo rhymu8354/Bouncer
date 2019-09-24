@@ -8,6 +8,7 @@
  * © 2019 by Richard Walters
  */
 
+#include <Http/TimeKeeper.hpp>
 #include <Twitch/TimeKeeper.hpp>
 #include <memory>
 
@@ -18,7 +19,8 @@ namespace Bouncer {
      * by the actual web server.
      */
     class TimeKeeper
-        : public Twitch::TimeKeeper
+        : public Http::TimeKeeper
+        , public Twitch::TimeKeeper
     {
         // Lifecycle Methods
     public:
@@ -35,6 +37,7 @@ namespace Bouncer {
          */
         TimeKeeper();
 
+        // Http::TimeKeeper
         // Twitch::TimeKeeper
     public:
         virtual double GetCurrentTime() override;
