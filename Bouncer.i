@@ -13,6 +13,7 @@
 #include <Bouncer/Configuration.hpp>
 #include <Bouncer/Host.hpp>
 #include <Bouncer/Main.hpp>
+#include <Bouncer/Stats.hpp>
 %}
 
 %include <stdint.i>
@@ -29,8 +30,15 @@
 
 %feature("director") Bouncer::Host;
 
+// The %include directives below need to be done in order
+// of dependencies (if A depends on B, list B first and then A).
+// -------
+%include "Bouncer/include/Bouncer/Stats.hpp"
+
 %include "Bouncer/include/Bouncer/Configuration.hpp"
 %include "Bouncer/include/Bouncer/Host.hpp"
+
 %include "Bouncer/include/Bouncer/Main.hpp"
+// -------
 
 %template(StdVectorString) std::vector< std::string >;

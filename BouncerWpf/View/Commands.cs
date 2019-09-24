@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,15 +9,8 @@ namespace Bouncer.Wpf.View {
     public static class Commands {
         #region Public Properties
 
-        public static RoutedUICommand Configure {
-            get;
-            private set;
-        }
-
-        public static RoutedUICommand Exit {
-            get;
-            private set;
-        }
+        public static RoutedUICommand Configure { get; private set; }
+        public static RoutedUICommand Exit { get; private set; }
 
         #endregion
 

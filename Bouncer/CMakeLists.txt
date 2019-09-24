@@ -9,6 +9,7 @@ set(Headers
     include/Bouncer/Configuration.hpp
     include/Bouncer/Host.hpp
     include/Bouncer/Main.hpp
+    include/Bouncer/Stats.hpp
 )
 
 set(Sources

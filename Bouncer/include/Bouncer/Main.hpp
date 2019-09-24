@@ -10,6 +10,7 @@
 
 #include <Bouncer/Configuration.hpp>
 #include <Bouncer/Host.hpp>
+#include <Bouncer/Stats.hpp>
 #include <memory>
 
 namespace Bouncer {
@@ -34,17 +35,23 @@ namespace Bouncer {
          */
         Main();
 
+        Configuration GetConfiguration();
+
+        Stats GetStats();
+
+        void SetConfiguration(const Configuration& configuration);
+
         /**
          * Begin the background processing of the application.
          *
          * @param[in] host
          *     This is the interface to the framework hosting the application.
          */
-        void Start(std::shared_ptr< Host > host);
+        void StartApplication(std::shared_ptr< Host > host);
 
-        Configuration GetConfiguration();
+        void StartViewTimer();
 
-        void SetConfiguration(const Configuration& configuration);
+        void StopViewTimer();
 
         // Private properties
     private:

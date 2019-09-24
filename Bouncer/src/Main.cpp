@@ -434,6 +434,7 @@ namespace Bouncer {
 
         std::weak_ptr< Impl > selfWeak;
         State state = State::Unconfigured;
+        Stats stats;
         AsyncData::MultiProducerSingleConsumerQueue< StatusMessage > statusMessages;
         bool stopDiagnosticsWorker = false;
         bool stopWorker = false;
@@ -442,6 +443,8 @@ namespace Bouncer {
         AsyncData::MultiProducerSingleConsumerQueue< std::string > userLookupsByLogin;
         bool userLookupsPending = false;
         std::map< intmax_t, User > usersById;
+        bool viewTimerRunning = false;
+        double viewTimerStart = 0.0;
         std::condition_variable wakeDiagnosticsWorker;
         std::condition_variable_any wakeWorker;
         std::thread worker;
@@ -531,6 +534,8 @@ namespace Bouncer {
             configuration.clientId = (std::string)json["clientId"];
             configuration.channel = (std::string)json["channel"];
             configuration.newAccountAgeThreshold = (double)json["newAccountAgeThreshold"];
+            stats.maxViewerCount = (size_t)json["maxViewerCount"];
+            stats.totalViewTimeRecorded = (double)json["totalViewTimeRecorded"];
             const auto& whitelist = json["whitelist"];
             configuration.whitelist.clear();
             const auto numWhitelistEntries = whitelist.GetSize();
@@ -801,6 +806,7 @@ namespace Bouncer {
             if (membershipInfo.user == configuration.account) {
                 PostStatus("Joined room");
                 state = State::InsideRoom;
+                stats.currentViewerCount = 0;
                 //tmi.SendMessage(
                 //    configuration.channel,
                 //    "Hello, World!"
@@ -815,6 +821,7 @@ namespace Bouncer {
             if (membershipInfo.user == configuration.account) {
                 PostStatus("Left room");
                 state = State::OutsideRoom;
+                stats.currentViewerCount = 0;
             } else {
                 const auto userIdsByLoginEntry = userIdsByLogin.find(membershipInfo.user);
                 if (userIdsByLoginEntry != userIdsByLogin.end()) {
@@ -912,161 +919,6 @@ namespace Bouncer {
 
         void PostStatus(const std::string& message) {
             diagnosticsSender.SendDiagnosticInformationString(3, message);
-        }
-
-        void PublishMessages() {
-            while (!statusMessages.IsEmpty()) {
-                const auto statusMessage = statusMessages.Remove();
-                host->StatusMessage(
-                    statusMessage.level,
-                    statusMessage.message
-                );
-            }
-        }
-
-        void SaveConfiguration() {
-            nextConfigurationAutoSaveTime = timeKeeper->GetCurrentTime() + configurationAutoSaveCooldown;
-            auto json = Json::Object({
-                {"account", configuration.account},
-                {"token", configuration.token},
-                {"clientId", configuration.clientId},
-                {"channel", configuration.channel},
-                {"newAccountAgeThreshold", configuration.newAccountAgeThreshold},
-                {"whitelist", Json::Array({})},
-                {"users", Json::Array({})},
-            });
-            auto& whitelist = json["whitelist"];
-            for (const auto& whitelistEntry: configuration.whitelist) {
-                whitelist.Add(whitelistEntry);
-            }
-            auto& users = json["users"];
-            for (const auto& usersByIdEntry: usersById) {
-                auto userEncoded = Json::Object({
-                    {"id", (size_t)usersByIdEntry.first},
-                    {"login", usersByIdEntry.second.login},
-                    {"name", usersByIdEntry.second.name},
-                    {"createdAt", usersByIdEntry.second.createdAt},
-                    {"totalViewTime", usersByIdEntry.second.totalViewTime},
-                    {"lastMessageTime", usersByIdEntry.second.lastMessageTime},
-                    {"numMessages", usersByIdEntry.second.numMessages},
-                    {"timeout", usersByIdEntry.second.timeout},
-                    {"isBanned", usersByIdEntry.second.isBanned},
-                });
-                switch (usersByIdEntry.second.bot) {
-                    case User::Bot::Yes: {
-                        userEncoded["bot"] = "yes";
-                    } break;
-
-                    case User::Bot::No: {
-                        userEncoded["bot"] = "no";
-                    } break;
-
-                    default: break;
-                }
-                users.Add(std::move(userEncoded));
-            }
-
-            Json::EncodingOptions jsonEncodingOptions;
-            jsonEncodingOptions.pretty = true;
-            jsonEncodingOptions.reencode = true;
-            (void)SaveFile(
-                configurationFilePath,
-                "configuration",
-                diagnosticsSender,
-                json.ToEncoding(jsonEncodingOptions)
-            );
-        }
-
-        void StartDiagnosticsWorker() {
-            if (diagnosticsWorker.joinable()) {
-                return;
-            }
-            std::lock_guard< decltype(diagnosticsMutex) > lock(diagnosticsMutex);
-            stopDiagnosticsWorker = false;
-            diagnosticsWorker = std::thread(&Impl::DiagnosticsWorker, this);
-        }
-
-        void StartWorker() {
-            if (worker.joinable()) {
-                return;
-            }
-            std::lock_guard< decltype(mutex) > lock(mutex);
-            stopWorker = false;
-            worker = std::thread(&Impl::Worker, this);
-        }
-
-        void StopDiagnosticsWorker() {
-            if (!diagnosticsWorker.joinable()) {
-                return;
-            }
-            NotifyStopDiagnosticsWorker();
-            diagnosticsWorker.join();
-        }
-
-        void StopWorker() {
-            if (!worker.joinable()) {
-                return;
-            }
-            NotifyStopWorker();
-            worker.join();
-        }
-
-        void UserParted(
-            intmax_t userid,
-            double partTime
-        ) {
-            auto& user = usersById[userid];
-            if (user.isJoined) {
-                user.totalViewTime += (partTime - user.joinTime);
-            }
-            user.isJoined = false;
-            user.partTime = partTime;
-            diagnosticsSender.SendDiagnosticInformationFormatted(
-                2,
-                "User %" PRIdMAX " (%s) has parted",
-                userid,
-                user.login.c_str()
-            );
-        }
-
-        void UserJoined(
-            intmax_t userid,
-            double joinTime
-        ) {
-            auto& user = usersById[userid];
-            user.isJoined = true;
-            user.joinTime = joinTime;
-            diagnosticsSender.SendDiagnosticInformationFormatted(
-                2,
-                "User %" PRIdMAX " (%s) has joined (account age: %lf)",
-                userid,
-                user.login.c_str(),
-                timeKeeper->GetCurrentTime() - user.createdAt
-            );
-        }
-
-        void UsersJoined(const std::vector< std::string >& logins) {
-            const auto joinTime = timeKeeper->GetCurrentTime();
-            for (const auto& login: logins) {
-                auto userIdsByLoginEntry = userIdsByLogin.find(login);
-                if (userIdsByLoginEntry == userIdsByLogin.end()) {
-                    userLookupsByLogin.Add(login);
-                    userJoinsByLogin[login] = joinTime;
-                } else {
-                    const auto userid = userIdsByLoginEntry->second;
-                    auto& user = usersById[userid];
-                    if (!user.isJoined) {
-                        UserJoined(userid, joinTime);
-                    }
-                }
-            }
-            if (
-                userLookupsByLogin.IsEmpty()
-                || userLookupsPending
-            ) {
-                return;
-            }
-            PostUserLookupsByLogin();
         }
 
         void PostUserLookupsByLogin() {
@@ -1180,6 +1032,206 @@ namespace Bouncer {
             );
         }
 
+        void PublishMessages() {
+            while (!statusMessages.IsEmpty()) {
+                const auto statusMessage = statusMessages.Remove();
+                host->StatusMessage(
+                    statusMessage.level,
+                    statusMessage.message
+                );
+            }
+        }
+
+        void SaveConfiguration() {
+            const auto now = timeKeeper->GetCurrentTime();
+            nextConfigurationAutoSaveTime = now + configurationAutoSaveCooldown;
+            const auto viewTimerTotalTime = (
+                viewTimerRunning
+                ? now - viewTimerStart
+                : 0.0
+            );
+            const auto totalViewTimeRecorded = stats.totalViewTimeRecorded + viewTimerTotalTime;
+            auto json = Json::Object({
+                {"account", configuration.account},
+                {"token", configuration.token},
+                {"clientId", configuration.clientId},
+                {"channel", configuration.channel},
+                {"newAccountAgeThreshold", configuration.newAccountAgeThreshold},
+                {"whitelist", Json::Array({})},
+                {"users", Json::Array({})},
+                {"maxViewerCount", stats.maxViewerCount},
+                {"totalViewTimeRecorded", totalViewTimeRecorded},
+            });
+            auto& whitelist = json["whitelist"];
+            for (const auto& whitelistEntry: configuration.whitelist) {
+                whitelist.Add(whitelistEntry);
+            }
+            auto& users = json["users"];
+            for (const auto& usersByIdEntry: usersById) {
+                const auto& user = usersByIdEntry.second;
+                auto totalViewTime = user.totalViewTime;
+                if (user.isJoined) {
+                    totalViewTime += viewTimerTotalTime;
+                }
+                auto userEncoded = Json::Object({
+                    {"id", (size_t)usersByIdEntry.first},
+                    {"login", user.login},
+                    {"name", user.name},
+                    {"createdAt", user.createdAt},
+                    {"totalViewTime", totalViewTime},
+                    {"lastMessageTime", user.lastMessageTime},
+                    {"numMessages", user.numMessages},
+                    {"timeout", user.timeout},
+                    {"isBanned", user.isBanned},
+                });
+                switch (user.bot) {
+                    case User::Bot::Yes: {
+                        userEncoded["bot"] = "yes";
+                    } break;
+
+                    case User::Bot::No: {
+                        userEncoded["bot"] = "no";
+                    } break;
+
+                    default: break;
+                }
+                users.Add(std::move(userEncoded));
+            }
+
+            Json::EncodingOptions jsonEncodingOptions;
+            jsonEncodingOptions.pretty = true;
+            jsonEncodingOptions.reencode = true;
+            (void)SaveFile(
+                configurationFilePath,
+                "configuration",
+                diagnosticsSender,
+                json.ToEncoding(jsonEncodingOptions)
+            );
+        }
+
+        void StartDiagnosticsWorker() {
+            if (diagnosticsWorker.joinable()) {
+                return;
+            }
+            std::lock_guard< decltype(diagnosticsMutex) > lock(diagnosticsMutex);
+            stopDiagnosticsWorker = false;
+            diagnosticsWorker = std::thread(&Impl::DiagnosticsWorker, this);
+        }
+
+        void StartWorker() {
+            if (worker.joinable()) {
+                return;
+            }
+            std::lock_guard< decltype(mutex) > lock(mutex);
+            stopWorker = false;
+            worker = std::thread(&Impl::Worker, this);
+        }
+
+        void StopDiagnosticsWorker() {
+            if (!diagnosticsWorker.joinable()) {
+                return;
+            }
+            NotifyStopDiagnosticsWorker();
+            diagnosticsWorker.join();
+        }
+
+        void StopWorker() {
+            if (!worker.joinable()) {
+                return;
+            }
+            NotifyStopWorker();
+            worker.join();
+        }
+
+        void UserParted(
+            intmax_t userid,
+            double partTime
+        ) {
+            auto& user = usersById[userid];
+            if (
+                user.isJoined
+                && viewTimerRunning
+            ) {
+                user.totalViewTime += (partTime - user.joinTime);
+            }
+            if (
+                user.isJoined
+                && (user.bot != User::Bot::Yes)
+            ) {
+                ViewerCountDown();
+            }
+            user.isJoined = false;
+            user.partTime = partTime;
+            diagnosticsSender.SendDiagnosticInformationFormatted(
+                2,
+                "User %" PRIdMAX " (%s) has parted",
+                userid,
+                user.login.c_str()
+            );
+        }
+
+        void UserJoined(
+            intmax_t userid,
+            double joinTime
+        ) {
+            auto& user = usersById[userid];
+            if (
+                !user.isJoined
+                && (user.bot != User::Bot::Yes)
+            ) {
+                ViewerCountUp();
+            }
+            user.isJoined = true;
+            user.joinTime = joinTime;
+            diagnosticsSender.SendDiagnosticInformationFormatted(
+                2,
+                "User %" PRIdMAX " (%s) has joined (account age: %lf)",
+                userid,
+                user.login.c_str(),
+                timeKeeper->GetCurrentTime() - user.createdAt
+            );
+        }
+
+        void UsersJoined(const std::vector< std::string >& logins) {
+            const auto joinTime = timeKeeper->GetCurrentTime();
+            for (const auto& login: logins) {
+                auto userIdsByLoginEntry = userIdsByLogin.find(login);
+                if (userIdsByLoginEntry == userIdsByLogin.end()) {
+                    userLookupsByLogin.Add(login);
+                    userJoinsByLogin[login] = joinTime;
+                } else {
+                    const auto userid = userIdsByLoginEntry->second;
+                    auto& user = usersById[userid];
+                    if (!user.isJoined) {
+                        UserJoined(userid, joinTime);
+                    }
+                }
+            }
+            if (
+                userLookupsByLogin.IsEmpty()
+                || userLookupsPending
+            ) {
+                return;
+            }
+            PostUserLookupsByLogin();
+        }
+
+        void ViewerCountDown() {
+            --stats.currentViewerCount;
+        }
+
+        void ViewerCountUp() {
+            ++stats.currentViewerCount;
+            stats.maxViewerCount = std::max(
+                stats.maxViewerCount,
+                stats.currentViewerCount
+            );
+            stats.maxViewerCountThisInstance = std::max(
+                stats.maxViewerCountThisInstance,
+                stats.maxViewerCount
+            );
+        }
+
         void Worker() {
             std::unique_lock< decltype(mutex) > lock(mutex);
             WorkerBody(lock);
@@ -1272,13 +1324,6 @@ namespace Bouncer {
                     );
                 }
             }
-            auto now = timeKeeper->GetCurrentTime();
-            for (auto& usersByIdEntry: usersById) {
-                auto& user = usersByIdEntry.second;
-                if (user.isJoined) {
-                    user.totalViewTime += (now - user.joinTime);
-                }
-            }
             SaveConfiguration();
         }
     };
@@ -1298,24 +1343,74 @@ namespace Bouncer {
         impl_->twitchDelegate->implWeak = impl_;
     }
 
-    void Main::Start(std::shared_ptr< Host > host) {
+    Configuration Main::GetConfiguration() {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        return impl_->configuration;
+    }
+
+    Stats Main::GetStats() {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        const auto now = impl_->timeKeeper->GetCurrentTime();
+        auto statsSnapshot = impl_->stats;
+        const auto viewTimerTotalTime = (
+            impl_->viewTimerRunning
+            ? now - impl_->viewTimerStart
+            : 0.0
+        );
+        statsSnapshot.totalViewTimeRecorded += viewTimerTotalTime;
+        statsSnapshot.totalViewTimeRecordedThisInstance += viewTimerTotalTime;
+        return statsSnapshot;
+    }
+
+    void Main::SetConfiguration(const Configuration& configuration) {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        impl_->configuration = configuration;
+        impl_->configurationChanged = true;
+        impl_->SaveConfiguration();
+        impl_->wakeWorker.notify_one();
+    }
+
+    void Main::StartApplication(std::shared_ptr< Host > host) {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
         impl_->host = host;
         impl_->PostStatus("Starting");
         impl_->StartDiagnosticsWorker();
         impl_->StartWorker();
     }
 
-    Configuration Main::GetConfiguration() {
-        std::unique_lock< decltype(impl_->mutex) > lock(impl_->mutex);
-        return impl_->configuration;
+    void Main::StartViewTimer() {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        if (impl_->viewTimerRunning) {
+            return;
+        }
+        impl_->viewTimerRunning = true;
+        impl_->viewTimerStart = impl_->timeKeeper->GetCurrentTime();
+        impl_->PostStatus("View timer has started");
+        for (auto& usersByIdEntry: impl_->usersById) {
+            auto& user = usersByIdEntry.second;
+            if (user.isJoined) {
+                user.joinTime = impl_->viewTimerStart;
+            }
+        }
     }
 
-    void Main::SetConfiguration(const Configuration& configuration) {
-        std::unique_lock< decltype(impl_->mutex) > lock(impl_->mutex);
-        impl_->configuration = configuration;
-        impl_->configurationChanged = true;
-        impl_->SaveConfiguration();
-        impl_->wakeWorker.notify_one();
+    void Main::StopViewTimer() {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        if (!impl_->viewTimerRunning) {
+            return;
+        }
+        impl_->viewTimerRunning = false;
+        const auto now = impl_->timeKeeper->GetCurrentTime();
+        const auto viewTimerTotalTime = now - impl_->viewTimerStart;
+        impl_->stats.totalViewTimeRecordedThisInstance += viewTimerTotalTime;
+        impl_->stats.totalViewTimeRecorded += viewTimerTotalTime;
+        impl_->PostStatus("View timer has stopped");
+        for (auto& usersByIdEntry: impl_->usersById) {
+            auto& user = usersByIdEntry.second;
+            if (user.isJoined) {
+                user.totalViewTime += (now - user.joinTime);
+            }
+        }
     }
 
 }

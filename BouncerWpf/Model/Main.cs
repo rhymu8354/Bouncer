@@ -60,6 +60,47 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        private bool viewTimerRunning_ = false;
+        public bool ViewTimerRunning {
+            get {
+                return viewTimerRunning_;
+            }
+            set {
+                if (ViewTimerRunning == value) {
+                    return;
+                }
+                viewTimerRunning_ = value;
+                if (ViewTimerRunning) {
+                    Native.StartViewTimer();
+                } else {
+                    Native.StopViewTimer();
+                }
+            }
+        }
+
+        public string TimeReport {
+            get {
+                var stats = Native.GetStats();
+                return String.Format(
+                    "{0} / {1}",
+                    Utilities.FormatDeltaTime(stats.totalViewTimeRecordedThisInstance),
+                    Utilities.FormatDeltaTime(stats.totalViewTimeRecorded)
+                );
+            }
+        }
+
+        public string ViewersReport {
+            get {
+                var stats = Native.GetStats();
+                return String.Format(
+                    "{0} / {1} / {2}",
+                    stats.currentViewerCount,
+                    stats.maxViewerCountThisInstance,
+                    stats.maxViewerCount
+                );
+            }
+        }
+
         #endregion
 
         #region Public Methods
@@ -68,7 +109,10 @@ namespace Bouncer.Wpf.Model {
             Dispatcher = dispatcher;
             Native = new Bouncer.Main();
             HostFacet = new Host(this);
-            Native.Start(HostFacet);
+            Native.StartApplication(HostFacet);
+            RefreshTimer.Tick += OnRefreshTimerTick;
+            RefreshTimer.Interval = new TimeSpan(0, 0, 1);
+            RefreshTimer.Start();
         }
 
         #endregion
@@ -92,6 +136,7 @@ namespace Bouncer.Wpf.Model {
         protected virtual void Dispose(bool disposing) {
             if (!Disposed) {
                 if (disposing) {
+                    RefreshTimer.Tick -= OnRefreshTimerTick;
                     Native = null;
                     HostFacet = null;
                 }
@@ -107,13 +152,19 @@ namespace Bouncer.Wpf.Model {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
+        private void OnRefreshTimerTick(object sender, EventArgs e) {
+            NotifyPropertyChanged("TimeReport");
+            NotifyPropertyChanged("ViewersReport");
+        }
+
         #endregion
 
         #region Private Properties
 
+        private Dispatcher Dispatcher { get; set; }
         private bool Disposed { get; set; } = false;
         private Host HostFacet { get; set; }
-        private Dispatcher Dispatcher { get; set; }
+        private DispatcherTimer RefreshTimer { get; set; } = new DispatcherTimer();
 
         #endregion
     }
