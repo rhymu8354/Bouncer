@@ -281,6 +281,14 @@ namespace Bouncer {
                 impl->OnLeave(std::move(membershipInfo));
             }
 
+            virtual void NameList(Twitch::Messaging::NameListInfo&& nameListInfo) override {
+                const auto impl = implWeak.lock();
+                if (impl == nullptr) {
+                    return;
+                }
+                impl->OnNameList(std::move(nameListInfo));
+            }
+
             virtual void Message(Twitch::Messaging::MessageInfo&& messageInfo) override {
                 const auto impl = implWeak.lock();
                 if (impl == nullptr) {
@@ -627,6 +635,11 @@ namespace Bouncer {
                     }
                 }
             }
+        }
+
+        void OnNameList(Twitch::Messaging::NameListInfo&& nameListInfo) {
+            std::lock_guard< decltype(mutex) > lock(mutex);
+            UsersJoined(std::move(nameListInfo.names));
         }
 
         void PostApiCall(std::function< void() > apiCall) {
