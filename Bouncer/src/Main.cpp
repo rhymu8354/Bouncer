@@ -630,12 +630,73 @@ namespace Bouncer {
         }
 
         void PostApiCall(std::function< void() > apiCall) {
-            diagnosticsSender.SendDiagnosticInformationString(
-                3,
-                "Posting API call"
-            );
             apiCalls.Add(apiCall);
             wakeWorker.notify_one();
+        }
+
+        void PostApiCall(
+            const std::string& targetUriString,
+            std::function<
+                void(
+                    Impl& impl,
+                    int id,
+                    const Http::IClient::Transaction& transaction
+                )
+            > onCompletion
+        ) {
+            PostApiCall(
+                [
+                    onCompletion,
+                    targetUriString,
+                    this
+                ]{
+                    apiCallInProgress = true;
+                    const auto id = nextHttpClientTransactionId++;
+                    diagnosticsSender.SendDiagnosticInformationFormatted(
+                        2,
+                        "Twitch API call %d: %s",
+                        id,
+                        targetUriString.c_str()
+                    );
+                    Http::Request request;
+                    request.method = "GET";
+                    request.target.ParseFromString(targetUriString);
+                    request.target.SetPort(443);
+                    request.headers.SetHeader("Client-ID", configuration.clientId);
+                    request.headers.SetHeader("Accept", "application/vnd.twitchtv.v5+json");
+                    auto& httpClientTransaction = httpClientTransactions[id];
+                    httpClientTransaction = httpClient->Request(request);
+                    auto selfWeakCopy(selfWeak);
+                    httpClientTransaction->SetCompletionDelegate(
+                        [
+                            id,
+                            onCompletion,
+                            selfWeakCopy
+                        ]{
+                            auto impl = selfWeakCopy.lock();
+                            if (impl == nullptr) {
+                                return;
+                            }
+                            std::lock_guard< decltype(impl->mutex) > lock(impl->mutex);
+                            impl->apiCallInProgress = false;
+                            impl->nextApiCallTime = impl->timeKeeper->GetCurrentTime() + twitchApiLookupCooldown;
+                            impl->wakeWorker.notify_one();
+                            auto httpClientTransactionsEntry = impl->httpClientTransactions.find(id);
+                            if (httpClientTransactionsEntry == impl->httpClientTransactions.end()) {
+                                return;
+                            }
+                            const auto& httpClientTransaction = httpClientTransactionsEntry->second;
+                            onCompletion(*impl, id, *httpClientTransaction);
+                            (void)impl->httpClientTransactions.erase(httpClientTransactionsEntry);
+                            if (impl->userLookupsByLogin.IsEmpty()) {
+                                impl->userLookupsPending = false;
+                            } else {
+                                impl->PostUserLookupsByLogin();
+                            }
+                        }
+                    );
+                }
+            );
         }
 
         void PostStatus(const std::string& message) {
@@ -774,121 +835,80 @@ namespace Bouncer {
                 (void)logins.insert(userLookupsByLogin.Remove());
             }
             userLookupsPending = true;
+            std::string targetUriString = "https://api.twitch.tv/kraken/users?login=";
+            bool first = true;
+            for (const auto& login: logins) {
+                if (first) {
+                    first = false;
+                } else {
+                    targetUriString += ",";
+                }
+                targetUriString += login;
+            }
             PostApiCall(
-                [
-                    this,
-                    logins
-                ]{
-                    apiCallInProgress = true;
-                    std::string targetAsString = "https://api.twitch.tv/kraken/users?login=";
-                    bool first = true;
-                    for (const auto& login: logins) {
-                        if (first) {
-                            first = false;
-                        } else {
-                            targetAsString += ",";
-                        }
-                        targetAsString += login;
-                    }
-                    const auto id = nextHttpClientTransactionId++;
-                    diagnosticsSender.SendDiagnosticInformationFormatted(
-                        2,
-                        "Twitch API call %d: %s",
-                        id,
-                        targetAsString.c_str()
-                    );
-                    Http::Request request;
-                    request.method = "GET";
-                    request.target.ParseFromString(targetAsString);
-                    request.target.SetPort(443);
-                    request.headers.SetHeader("Client-ID", configuration.clientId);
-                    request.headers.SetHeader("Accept", "application/vnd.twitchtv.v5+json");
-                    auto& httpClientTransaction = httpClientTransactions[id];
-                    httpClientTransaction = httpClient->Request(request);
-                    auto selfWeakCopy(selfWeak);
-                    httpClientTransaction->SetCompletionDelegate(
-                        [
-                            id,
-                            selfWeakCopy
-                        ]{
-                            auto impl = selfWeakCopy.lock();
-                            if (impl == nullptr) {
-                                return;
-                            }
-                            std::lock_guard< decltype(impl->mutex) > lock(impl->mutex);
-                            impl->apiCallInProgress = false;
-                            impl->nextApiCallTime = impl->timeKeeper->GetCurrentTime() + twitchApiLookupCooldown;
-                            impl->wakeWorker.notify_one();
-                            auto httpClientTransactionsEntry = impl->httpClientTransactions.find(id);
-                            if (httpClientTransactionsEntry == impl->httpClientTransactions.end()) {
-                                return;
-                            }
-                            const auto& httpClientTransaction = httpClientTransactionsEntry->second;
-                            if (httpClientTransaction->response.statusCode == 200) {
-                                const auto users = Json::Value::FromEncoding(httpClientTransaction->response.body)["users"];
-                                for (size_t i = 0; i < users.GetSize(); ++i) {
-                                    const auto& userEncoded = users[i];
-                                    intmax_t userid;
-                                    if (
-                                        sscanf(
-                                            ((std::string)userEncoded["_id"]).c_str(), "%" SCNdMAX,
-                                            &userid
-                                        ) != 1
-                                    ) {
-                                        impl->diagnosticsSender.SendDiagnosticInformationFormatted(
-                                            SystemAbstractions::DiagnosticsSender::Levels::WARNING,
-                                            "Twitch API call %d returned user %zu with invalid ID",
-                                            id,
-                                            i
-                                        );
-                                        continue;
-                                    }
-                                    const auto login = (std::string)userEncoded["name"];
-                                    if (login.empty()) {
-                                        impl->diagnosticsSender.SendDiagnosticInformationFormatted(
-                                            SystemAbstractions::DiagnosticsSender::Levels::WARNING,
-                                            "Twitch API call %d returned user %zu with missing login",
-                                            id,
-                                            i
-                                        );
-                                        continue;
-                                    }
-                                    auto userLookupsByLoginEntry = impl->userJoinsByLogin.find(login);
-                                    if (userLookupsByLoginEntry == impl->userJoinsByLogin.end()) {
-                                        impl->diagnosticsSender.SendDiagnosticInformationFormatted(
-                                            SystemAbstractions::DiagnosticsSender::Levels::WARNING,
-                                            "Twitch API call %d returned user %zu with unexpected login (%s)",
-                                            id,
-                                            i,
-                                            login.c_str()
-                                        );
-                                        continue;
-                                    }
-                                    const auto joinTime = userLookupsByLoginEntry->second;
-                                    (void)impl->userJoinsByLogin.erase(userLookupsByLoginEntry);
-                                    impl->userIdsByLogin[login] = userid;
-                                    auto& user = impl->usersById[userid];
-                                    user.login = login;
-                                    user.name = (std::string)userEncoded["display_name"];
-                                    user.createdAt = ParseTimestamp((std::string)userEncoded["created_at"]);
-                                    impl->UserJoined(userid, joinTime);
-                                }
-                            } else {
-                                impl->diagnosticsSender.SendDiagnosticInformationFormatted(
+                targetUriString,
+                [](
+                    Impl& impl,
+                    int id,
+                    const Http::IClient::Transaction& transaction
+                ){
+                    if (transaction.response.statusCode == 200) {
+                        const auto users = Json::Value::FromEncoding(transaction.response.body)["users"];
+                        for (size_t i = 0; i < users.GetSize(); ++i) {
+                            const auto& userEncoded = users[i];
+                            intmax_t userid;
+                            if (
+                                sscanf(
+                                    ((std::string)userEncoded["_id"]).c_str(), "%" SCNdMAX,
+                                    &userid
+                                ) != 1
+                            ) {
+                                impl.diagnosticsSender.SendDiagnosticInformationFormatted(
                                     SystemAbstractions::DiagnosticsSender::Levels::WARNING,
-                                    "Twitch API call %d returned code %d",
+                                    "Twitch API call %d returned user %zu with invalid ID",
                                     id,
-                                    httpClientTransaction->response.statusCode
+                                    i
                                 );
+                                continue;
                             }
-                            (void)impl->httpClientTransactions.erase(httpClientTransactionsEntry);
-                            if (impl->userLookupsByLogin.IsEmpty()) {
-                                impl->userLookupsPending = false;
-                            } else {
-                                impl->PostUserLookupsByLogin();
+                            const auto login = (std::string)userEncoded["name"];
+                            if (login.empty()) {
+                                impl.diagnosticsSender.SendDiagnosticInformationFormatted(
+                                    SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                                    "Twitch API call %d returned user %zu with missing login",
+                                    id,
+                                    i
+                                );
+                                continue;
                             }
+                            auto userLookupsByLoginEntry = impl.userJoinsByLogin.find(login);
+                            if (userLookupsByLoginEntry == impl.userJoinsByLogin.end()) {
+                                impl.diagnosticsSender.SendDiagnosticInformationFormatted(
+                                    SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                                    "Twitch API call %d returned user %zu with unexpected login (%s)",
+                                    id,
+                                    i,
+                                    login.c_str()
+                                );
+                                continue;
+                            }
+                            const auto joinTime = userLookupsByLoginEntry->second;
+                            (void)impl.userJoinsByLogin.erase(userLookupsByLoginEntry);
+                            impl.userIdsByLogin[login] = userid;
+                            auto& user = impl.usersById[userid];
+                            user.login = login;
+                            user.name = (std::string)userEncoded["display_name"];
+                            user.createdAt = ParseTimestamp((std::string)userEncoded["created_at"]);
+                            impl.UserJoined(userid, joinTime);
                         }
-                    );
+                    } else {
+                        impl.diagnosticsSender.SendDiagnosticInformationFormatted(
+                            SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                            "Twitch API call %d returned code %d",
+                            id,
+                            transaction.response.statusCode
+                        );
+                    }
                 }
             );
         }
