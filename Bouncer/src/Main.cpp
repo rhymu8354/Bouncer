@@ -111,14 +111,15 @@ namespace {
      *     This is the timestamp to convert.
      *
      * @return
-     *     The equivalent timetamp in seconds since the UNIX epoch
+     *     The equivalent timestamp in seconds since the UNIX epoch
      *     is returned.
      */
     double ParseTimestamp(const std::string& timestamp) {
-        int years, months, days, hours, minutes, seconds;
+        int years, months, days, hours, minutes;
+        double seconds;
         (void)sscanf(
             timestamp.c_str(),
-            "%d-%d-%dT%d:%d:%dZ",
+            "%d-%d-%dT%d:%d:%lfZ",
             &years,
             &months,
             &days,
@@ -131,7 +132,7 @@ namespace {
             if ((year % 100) != 0) { return true; }
             return ((year % 400) == 0);
         };
-        auto total = (intmax_t)seconds;
+        intmax_t total = 0;
         for (int yy = 1970; yy < years; ++yy) {
             total += (isLeapYear(yy) ? 366 : 365) * 86400;
         }
@@ -150,7 +151,10 @@ namespace {
         total += (days - 1) * 86400;
         total += hours * 3600;
         total += minutes * 60;
-        return (double)total;
+        return (
+            (double)total
+            + seconds
+        );
     }
 
     /**
