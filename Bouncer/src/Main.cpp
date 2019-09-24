@@ -37,6 +37,7 @@ namespace {
 
     const auto configurationFilePath = SystemAbstractions::File::GetExeParentDirectory() + "/Bouncer.json";
     constexpr double twitchApiLookupCooldown = 1.0;
+    constexpr double configurationAutoSaveCooldown = 60.0;
     constexpr size_t maxTwitchUserLookupsByLogin = 100;
 
     template< typename T > void WithoutLock(
@@ -380,6 +381,11 @@ namespace Bouncer {
             double timeout = 0.0;
             bool isBanned = false;
             bool isJoined = false;
+            enum class Bot {
+                Unknown,
+                Yes,
+                No,
+            } bot = Bot::Unknown;
         };
 
         // Properties
@@ -404,6 +410,7 @@ namespace Bouncer {
         std::promise< void > loggedOut;
         std::recursive_mutex mutex;
         double nextApiCallTime = 0.0;
+        double nextConfigurationAutoSaveTime = 0.0;
 
         /**
          * This is used to select unique identifiers as keys for the
@@ -486,6 +493,7 @@ namespace Bouncer {
         }
 
         void LoadConfiguration() {
+            nextConfigurationAutoSaveTime = timeKeeper->GetCurrentTime() + configurationAutoSaveCooldown;
             std::string encodedConfiguration;
             if (
                 !LoadFile(
@@ -517,6 +525,33 @@ namespace Bouncer {
             for (size_t i = 0; i < numWhitelistEntries; ++i) {
                 configuration.whitelist.push_back((std::string)whitelist[i]);
             }
+            const auto& users = json["users"];
+            userIdsByLogin.clear();
+            userJoinsByLogin.clear();
+            usersById.clear();
+            const auto numUsers = users.GetSize();
+            for (size_t i = 0; i < numUsers; ++i) {
+                const auto& userEncoded = users[i];
+                const auto userid = (intmax_t)(size_t)userEncoded["id"];
+                auto& user = usersById[userid];
+                user.login = (std::string)userEncoded["login"];
+                user.name = (std::string)userEncoded["name"];
+                user.createdAt = (double)userEncoded["createdAt"];
+                user.totalViewTime = (double)userEncoded["totalViewTime"];
+                user.lastMessageTime = (double)userEncoded["lastMessageTime"];
+                user.numMessages = (size_t)userEncoded["numMessages"];
+                user.timeout = (double)userEncoded["timeout"];
+                user.isBanned = (bool)userEncoded["isBanned"];
+                if (userEncoded.Has("bot")) {
+                    const auto bot = (std::string)userEncoded["bot"];
+                    if (bot == "yes") {
+                        user.bot = User::Bot::Yes;
+                    } else if (bot == "no") {
+                        user.bot = User::Bot::No;
+                    }
+                }
+                userIdsByLogin[user.login] = userid;
+            }
             configurationChanged = true;
         }
 
@@ -530,7 +565,6 @@ namespace Bouncer {
         }
 
         void HandleConfigurationChanged() {
-            SaveConfiguration();
             const bool isConfigured = (
                 !configuration.account.empty()
                 && !configuration.token.empty()
@@ -727,6 +761,7 @@ namespace Bouncer {
         }
 
         void SaveConfiguration() {
+            nextConfigurationAutoSaveTime = timeKeeper->GetCurrentTime() + configurationAutoSaveCooldown;
             auto json = Json::Object({
                 {"account", configuration.account},
                 {"token", configuration.token},
@@ -734,15 +769,43 @@ namespace Bouncer {
                 {"channel", configuration.channel},
                 {"newAccountAgeThreshold", configuration.newAccountAgeThreshold},
                 {"whitelist", Json::Array({})},
+                {"users", Json::Array({})},
             });
             auto& whitelist = json["whitelist"];
             for (const auto& whitelistEntry: configuration.whitelist) {
                 whitelist.Add(whitelistEntry);
             }
+            auto& users = json["users"];
+            for (const auto& usersByIdEntry: usersById) {
+                auto userEncoded = Json::Object({
+                    {"id", (size_t)usersByIdEntry.first},
+                    {"login", usersByIdEntry.second.login},
+                    {"name", usersByIdEntry.second.name},
+                    {"createdAt", usersByIdEntry.second.createdAt},
+                    {"totalViewTime", usersByIdEntry.second.totalViewTime},
+                    {"lastMessageTime", usersByIdEntry.second.lastMessageTime},
+                    {"numMessages", usersByIdEntry.second.numMessages},
+                    {"timeout", usersByIdEntry.second.timeout},
+                    {"isBanned", usersByIdEntry.second.isBanned},
+                });
+                switch (usersByIdEntry.second.bot) {
+                    case User::Bot::Yes: {
+                        userEncoded["bot"] = "yes";
+                    } break;
+
+                    case User::Bot::No: {
+                        userEncoded["bot"] = "no";
+                    } break;
+
+                    default: break;
+                }
+                users.Add(std::move(userEncoded));
+            }
+
             Json::EncodingOptions jsonEncodingOptions;
             jsonEncodingOptions.pretty = true;
             jsonEncodingOptions.reencode = true;
-            SaveFile(
+            (void)SaveFile(
                 configurationFilePath,
                 "configuration",
                 diagnosticsSender,
@@ -909,8 +972,32 @@ namespace Bouncer {
                             (void)impl.userJoinsByLogin.erase(userLookupsByLoginEntry);
                             impl.userIdsByLogin[login] = userid;
                             auto& user = impl.usersById[userid];
-                            user.login = login;
-                            user.name = (std::string)userEncoded["display_name"];
+                            if (user.login != login) {
+                                if (!user.login.empty()) {
+                                    impl.diagnosticsSender.SendDiagnosticInformationFormatted(
+                                        3,
+                                        "Twitch user %" PRIdMAX " login changed from %s to %s",
+                                        userid,
+                                        user.login.c_str(),
+                                        login.c_str()
+                                    );
+                                    (void)impl.userIdsByLogin.erase(user.login);
+                                }
+                                user.login = login;
+                            }
+                            const auto name = (std::string)userEncoded["display_name"];
+                            if (user.name != name) {
+                                if (!user.name.empty()) {
+                                    impl.diagnosticsSender.SendDiagnosticInformationFormatted(
+                                        3,
+                                        "Twitch user %" PRIdMAX " display name changed from %s to %s",
+                                        userid,
+                                        user.name.c_str(),
+                                        name.c_str()
+                                    );
+                                }
+                                user.name = name;
+                            }
                             user.createdAt = ParseTimestamp((std::string)userEncoded["created_at"]);
                             impl.UserJoined(userid, joinTime);
                         }
@@ -988,35 +1075,28 @@ namespace Bouncer {
                     configurationChanged = false;
                     HandleConfigurationChanged();
                 }
-                const auto now = timeKeeper->GetCurrentTime();
+                auto now = timeKeeper->GetCurrentTime();
                 if (
                     !apiCallInProgress
                     && (now >= nextApiCallTime)
                 ) {
                     NextApiCall();
                 }
-                const auto workerWakeCondition = [this]{
-                    return (
-                        stopWorker
-                        || (
-                            !apiCalls.IsEmpty()
-                            && (timeKeeper->GetCurrentTime() >= nextApiCallTime)
-                        )
-                        || configurationChanged
-                    );
-                };
+                if (now >= nextConfigurationAutoSaveTime) {
+                    SaveConfiguration();
+                }
+                auto nextTimeout = nextConfigurationAutoSaveTime;
                 if (
-                    (nextApiCallTime == 0.0)
-                    || apiCallInProgress
+                    !apiCallInProgress
+                    && (nextApiCallTime != 0.0)
                 ) {
-                    wakeWorker.wait(lock);
-                } else if (
-                    (now < nextApiCallTime)
-                    && !workerWakeCondition()
-                ) {
-                    const auto nowClock = std::chrono::system_clock::now();
+                    nextTimeout = std::min(nextTimeout, nextApiCallTime);
+                }
+                const auto nowClock = std::chrono::system_clock::now();
+                now = timeKeeper->GetCurrentTime();
+                if (nextTimeout > now) {
                     const auto timeoutMilliseconds = (int)ceil(
-                        (nextApiCallTime - now)
+                        (nextTimeout - now)
                         * 1000.0
                     );
                     wakeWorker.wait_until(
@@ -1025,6 +1105,7 @@ namespace Bouncer {
                     );
                 }
             }
+            SaveConfiguration();
         }
     };
 
@@ -1059,6 +1140,7 @@ namespace Bouncer {
         std::unique_lock< decltype(impl_->mutex) > lock(impl_->mutex);
         impl_->configuration = configuration;
         impl_->configurationChanged = true;
+        impl_->SaveConfiguration();
         impl_->wakeWorker.notify_one();
     }
 
