@@ -1081,8 +1081,11 @@ namespace Bouncer {
             for (const auto& usersByIdEntry: usersById) {
                 const auto& user = usersByIdEntry.second;
                 auto totalViewTime = user.totalViewTime;
-                if (user.isJoined) {
-                    totalViewTime += viewTimerTotalTime;
+                if (
+                    viewTimerRunning
+                    && user.isJoined
+                ) {
+                    totalViewTime += (now - user.joinTime);
                 }
                 auto userEncoded = Json::Object({
                     {"id", (size_t)usersByIdEntry.first},
@@ -1379,15 +1382,15 @@ namespace Bouncer {
     std::vector< User > Main::GetUsers() {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
         const auto now = impl_->timeKeeper->GetCurrentTime();
-        const auto viewTimerTotalTime = (
-            impl_->viewTimerRunning
-            ? now - impl_->viewTimerStart
-            : 0.0
-        );
         std::vector< User > users;
         for (const auto& usersByIdEntry: impl_->usersById) {
             auto userSnapshot = usersByIdEntry.second;
             if (userSnapshot.isJoined) {
+                const auto viewTimerTotalTime = (
+                    impl_->viewTimerRunning
+                    ? now - userSnapshot.joinTime
+                    : 0.0
+                );
                 userSnapshot.totalViewTime += viewTimerTotalTime;
             }
             users.push_back(std::move(userSnapshot));
