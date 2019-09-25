@@ -37,19 +37,10 @@
 
 namespace {
 
-    const auto configurationFilePath = SystemAbstractions::File::GetExeParentDirectory() + "/Bouncer.json";
-    constexpr double twitchApiLookupCooldown = 1.0;
     constexpr double configurationAutoSaveCooldown = 60.0;
+    const auto configurationFilePath = SystemAbstractions::File::GetExeParentDirectory() + "/Bouncer.json";
     constexpr size_t maxTwitchUserLookupsByLogin = 100;
-
-    template< typename T > void WithoutLock(
-        T& lock,
-        std::function< void() > f
-    ) {
-        lock.unlock();
-        f();
-        lock.lock();
-    }
+    constexpr double twitchApiLookupCooldown = 1.0;
 
     /**
      * This function loads the contents of the file with the given path
@@ -221,6 +212,15 @@ namespace {
         return true;
     }
 
+    template< typename T > void WithoutLock(
+        T& lock,
+        std::function< void() > f
+    ) {
+        lock.unlock();
+        f();
+        lock.lock();
+    }
+
 }
 
 namespace Bouncer {
@@ -382,12 +382,15 @@ namespace Bouncer {
         };
 
         struct User {
+            intmax_t id = 0;
             std::string login;
             std::string name;
             double createdAt = 0.0;
             double totalViewTime = 0.0;
             double joinTime = 0.0;
             double partTime = 0.0;
+            double firstSeenTime = 0.0;
+            double firstMessageTime = 0.0;
             double lastMessageTime = 0.0;
             size_t numMessages = 0;
             double timeout = 0.0;
@@ -508,6 +511,22 @@ namespace Bouncer {
             WithoutLock(lock, [&]{ PublishMessages(); });
         }
 
+        void UserSeen(
+            User& user,
+            double time
+        ) {
+            if (user.firstSeenTime == 0.0) {
+                user.firstSeenTime = time;
+                diagnosticsSender.SendDiagnosticInformationFormatted(
+                    2,
+                    "User %" PRIdMAX " (%s) seen for the first time (%lf)",
+                    user.id,
+                    user.login.c_str(),
+                    time
+                );
+            }
+        }
+
         void LoadConfiguration() {
             nextConfigurationAutoSaveTime = timeKeeper->GetCurrentTime() + configurationAutoSaveCooldown;
             std::string encodedConfiguration;
@@ -552,10 +571,13 @@ namespace Bouncer {
                 const auto& userEncoded = users[i];
                 const auto userid = (intmax_t)(size_t)userEncoded["id"];
                 auto& user = usersById[userid];
+                user.id = userid;
                 user.login = (std::string)userEncoded["login"];
                 user.name = (std::string)userEncoded["name"];
                 user.createdAt = (double)userEncoded["createdAt"];
                 user.totalViewTime = (double)userEncoded["totalViewTime"];
+                user.firstSeenTime = (double)userEncoded["firstSeenTime"];
+                user.firstMessageTime = (double)userEncoded["firstMessageTime"];
                 user.lastMessageTime = (double)userEncoded["lastMessageTime"];
                 user.numMessages = (size_t)userEncoded["numMessages"];
                 user.timeout = (double)userEncoded["timeout"];
@@ -628,7 +650,10 @@ namespace Bouncer {
                     if (noMessagesWereAlreadyAwaitingProcessing) {
                         LookupUserById(
                             userid,
-                            [userid](Impl& impl){
+                            [
+                                messageTime,
+                                userid
+                            ](Impl& impl){
                                 auto& messagesAwaitingProcessingForUser = impl.messagesAwaitingProcessing[userid];
                                 while (!messagesAwaitingProcessingForUser.empty()) {
                                     auto& messageAwaitingProcessing = messagesAwaitingProcessingForUser.front();
@@ -644,6 +669,7 @@ namespace Bouncer {
                     }
                 } else {
                     auto& user = usersByIdEntry->second;
+                    user.id = userid;
                     if (user.login != messageInfo.user) {
                         if (!user.login.empty()) {
                             diagnosticsSender.SendDiagnosticInformationFormatted(
@@ -671,6 +697,10 @@ namespace Bouncer {
                     }
                     user.lastMessageTime = messageTime;
                     ++user.numMessages;
+                    UserSeen(user, messageTime);
+                    if (user.firstMessageTime == 0.0) {
+                        user.firstMessageTime = messageTime;
+                    }
                     diagnosticsSender.SendDiagnosticInformationFormatted(
                         3,
                         "Twitch user %" PRIdMAX " (%s) sent message #%zu at %lf",
@@ -991,6 +1021,7 @@ namespace Bouncer {
                             (void)impl.userJoinsByLogin.erase(userLookupsByLoginEntry);
                             impl.userIdsByLogin[login] = userid;
                             auto& user = impl.usersById[userid];
+                            user.id = userid;
                             if (user.login != login) {
                                 if (!user.login.empty()) {
                                     impl.diagnosticsSender.SendDiagnosticInformationFormatted(
@@ -1018,6 +1049,7 @@ namespace Bouncer {
                                 user.name = name;
                             }
                             user.createdAt = ParseTimestamp((std::string)userEncoded["created_at"]);
+                            impl.UserSeen(user, joinTime);
                             impl.UserJoined(userid, joinTime);
                         }
                     } else {
@@ -1079,6 +1111,8 @@ namespace Bouncer {
                     {"name", user.name},
                     {"createdAt", user.createdAt},
                     {"totalViewTime", totalViewTime},
+                    {"firstSeenTime", user.firstSeenTime},
+                    {"firstMessageTime", user.firstMessageTime},
                     {"lastMessageTime", user.lastMessageTime},
                     {"numMessages", user.numMessages},
                     {"timeout", user.timeout},
@@ -1202,6 +1236,7 @@ namespace Bouncer {
                 } else {
                     const auto userid = userIdsByLoginEntry->second;
                     auto& user = usersById[userid];
+                    UserSeen(user, joinTime);
                     if (!user.isJoined) {
                         UserJoined(userid, joinTime);
                     }
