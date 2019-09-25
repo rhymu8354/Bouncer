@@ -16,6 +16,8 @@
             <RowDefinition Height="auto" />
             <RowDefinition Height="auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Menu Grid.Row="0">
             <MenuItem Header="_App">
@@ -65,8 +67,38 @@
             <Label Grid.Row="1" Grid.Column="0" HorizontalAlignment="Right" Content="Viewers:" Padding="5,0" />
             <Label Content="{Binding ViewersReport}" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Padding="5,0" />
         </Grid>
-        <ListBox
+        <ListView
             Grid.Row="2"
+            ItemsSource="{Binding Users}"
+        >
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="ID" DisplayMemberBinding="{Binding id}" />
+                    <GridViewColumn Header="Login" DisplayMemberBinding="{Binding login}" />
+                    <GridViewColumn Header="Name" DisplayMemberBinding="{Binding name}" />
+                    <GridViewColumn Header="Created At" DisplayMemberBinding="{Binding createdAt}" />
+                    <GridViewColumn Header="View Time" DisplayMemberBinding="{Binding totalViewTime}" />
+                    <GridViewColumn Header="Joined At" DisplayMemberBinding="{Binding joinTime}" />
+                    <GridViewColumn Header="Parted At" DisplayMemberBinding="{Binding partTime}" />
+                    <GridViewColumn Header="Last Msg Time" DisplayMemberBinding="{Binding lastMessageTime}" />
+                    <GridViewColumn Header="Messages" DisplayMemberBinding="{Binding numMessages}" />
+                    <GridViewColumn Header="Timeout" DisplayMemberBinding="{Binding timeout}" />
+                    <GridViewColumn Header="Banned" DisplayMemberBinding="{Binding isBanned}" />
+                    <GridViewColumn Header="Joined" DisplayMemberBinding="{Binding isJoined}" />
+                    <GridViewColumn Header="Bot" DisplayMemberBinding="{Binding bot}" />
+                </GridView>
+            </ListView.View>
+        </ListView>
+        <GridSplitter
+            Grid.Row="3"
+            Height="5"
+            Background="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Center"
+            IsTabStop="False"
+        />
+        <ListBox
+            Grid.Row="4"
             ItemsSource="{Binding Messages}"
             Grid.IsSharedSizeScope="True"
             local:ListBoxExtensions.AutoScroll="True"
