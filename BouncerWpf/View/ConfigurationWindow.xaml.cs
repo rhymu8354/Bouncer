@@ -71,7 +71,7 @@ namespace Bouncer.Wpf.View {
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e) {
-            Configuration = new Model.Configuration(Model.Native.GetConfiguration());
+            Configuration = Model.Configuration;
         }
 
         private void OnNewWhitelistEntry(object sender, ExecutedRoutedEventArgs e) {
@@ -88,7 +88,7 @@ namespace Bouncer.Wpf.View {
         }
 
         private void OnSave(object sender, RoutedEventArgs e) {
-            Model.Native.SetConfiguration(Configuration.Adaptee);
+            Model.Configuration = Configuration;
             Close();
         }
 

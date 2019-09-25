@@ -43,22 +43,16 @@ namespace Bouncer.Wpf.Model {
 
         #region Public Properties
 
-        public ObservableCollection<Message> Messages { get; private set; } = new ObservableCollection<Message>();
-
-        private Bouncer.Main native_;
-        public Bouncer.Main Native {
+        public Configuration Configuration {
             get {
-                return native_;
+                return new Configuration(Native.GetConfiguration());
             }
-            private set {
-                if (Native != value) {
-                    if (Native != null) {
-                        Native.Dispose();
-                    }
-                    native_ = value;
-                }
+            set {
+                Native.SetConfiguration(value.Adaptee);
             }
         }
+
+        public ObservableCollection<Message> Messages { get; private set; } = new ObservableCollection<Message>();
 
         public Bouncer.Stats stats_;
         public Bouncer.Stats Stats {
@@ -73,11 +67,17 @@ namespace Bouncer.Wpf.Model {
                     Stats.Dispose();
                 }
                 stats_ = value;
+                NotifyPropertyChanged("Stats");
+                NotifyPropertyChanged("TimeReport");
+                NotifyPropertyChanged("ViewersReport");
             }
         }
 
         public string TimeReport {
             get {
+                if (Stats == null) {
+                    return "";
+                }
                 return String.Format(
                     "{0} / {1}",
                     Utilities.FormatDeltaTime(Stats.totalViewTimeRecordedThisInstance),
@@ -86,24 +86,21 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
-        public Bouncer.Users users_;
-        public Bouncer.Users Users {
+        public IEnumerable<User> Users {
             get {
-                return users_;
-            }
-            private set {
-                if (Users == value) {
-                    return;
+                if (NativeUsers != null) {
+                    foreach (var nativeUser in NativeUsers) {
+                        yield return new User(nativeUser);
+                    }
                 }
-                if (Users != null) {
-                    Users.Dispose();
-                }
-                users_ = value;
             }
         }
 
         public string ViewersReport {
             get {
+                if (Stats == null) {
+                    return "";
+                }
                 return String.Format(
                     "{0} / {1} / {2}",
                     Stats.currentViewerCount,
@@ -467,7 +464,7 @@ namespace Bouncer.Wpf.Model {
             HostFacet = new Host(this);
             Native.StartApplication(HostFacet);
             Stats = Native.GetStats();
-            Users = Native.GetUsers();
+            NativeUsers = Native.GetUsers();
             RefreshTimer.Tick += OnRefreshTimerTick;
             RefreshTimer.Interval = new TimeSpan(0, 0, 1);
             RefreshTimer.Start();
@@ -495,7 +492,7 @@ namespace Bouncer.Wpf.Model {
             if (!Disposed) {
                 if (disposing) {
                     RefreshTimer.Tick -= OnRefreshTimerTick;
-                    Users = null;
+                    NativeUsers = null;
                     Stats = null;
                     Native = null;
                     HostFacet = null;
@@ -514,11 +511,7 @@ namespace Bouncer.Wpf.Model {
 
         private void OnRefreshTimerTick(object sender, EventArgs e) {
             Stats = Native.GetStats();
-            Users = Native.GetUsers();
-            NotifyPropertyChanged("Stats");
-            NotifyPropertyChanged("TimeReport");
-            NotifyPropertyChanged("Users");
-            NotifyPropertyChanged("ViewersReport");
+            NativeUsers = Native.GetUsers();
         }
 
         #endregion
@@ -528,6 +521,39 @@ namespace Bouncer.Wpf.Model {
         private Dispatcher Dispatcher { get; set; }
         private bool Disposed { get; set; } = false;
         private Host HostFacet { get; set; }
+
+        private Bouncer.Main native_;
+        private Bouncer.Main Native {
+            get {
+                return native_;
+            }
+            set {
+                if (Native != value) {
+                    if (Native != null) {
+                        Native.Dispose();
+                    }
+                    native_ = value;
+                }
+            }
+        }
+
+        private Bouncer.Users nativeUsers_;
+        private Bouncer.Users NativeUsers {
+            get {
+                return nativeUsers_;
+            }
+            set {
+                if (NativeUsers == value) {
+                    return;
+                }
+                if (NativeUsers != null) {
+                    NativeUsers.Dispose();
+                }
+                nativeUsers_ = value;
+                NotifyPropertyChanged("Users");
+            }
+        }
+
         private DispatcherTimer RefreshTimer { get; set; } = new DispatcherTimer();
 
         #endregion

@@ -27,8 +27,10 @@ namespace Bouncer {
         double partTime = 0.0;
         double firstSeenTime = 0.0;
         double firstMessageTime = 0.0;
+        double firstMessageTimeThisInstance = 0.0;
         double lastMessageTime = 0.0;
         size_t numMessages = 0;
+        size_t numMessagesThisInstance = 0;
         double timeout = 0.0;
         bool isBanned = false;
         bool isJoined = false;
@@ -37,6 +39,13 @@ namespace Bouncer {
             Yes,
             No,
         } bot = Bot::Unknown;
+        enum class Role {
+            Unknown,
+            Pleb,
+            VIP,
+            Moderator,
+            Broadcaster,
+        } role = Role::Unknown;
     };
 
 }

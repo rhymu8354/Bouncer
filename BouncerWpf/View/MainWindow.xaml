@@ -73,19 +73,21 @@
         >
             <ListView.View>
                 <GridView>
-                    <GridViewColumn Header="ID" DisplayMemberBinding="{Binding id}" />
-                    <GridViewColumn Header="Login" DisplayMemberBinding="{Binding login}" />
-                    <GridViewColumn Header="Name" DisplayMemberBinding="{Binding name}" />
-                    <GridViewColumn Header="Created At" DisplayMemberBinding="{Binding createdAt}" />
-                    <GridViewColumn Header="View Time" DisplayMemberBinding="{Binding totalViewTime}" />
-                    <GridViewColumn Header="Joined At" DisplayMemberBinding="{Binding joinTime}" />
-                    <GridViewColumn Header="Parted At" DisplayMemberBinding="{Binding partTime}" />
-                    <GridViewColumn Header="Last Msg Time" DisplayMemberBinding="{Binding lastMessageTime}" />
-                    <GridViewColumn Header="Messages" DisplayMemberBinding="{Binding numMessages}" />
-                    <GridViewColumn Header="Timeout" DisplayMemberBinding="{Binding timeout}" />
-                    <GridViewColumn Header="Banned" DisplayMemberBinding="{Binding isBanned}" />
-                    <GridViewColumn Header="Joined" DisplayMemberBinding="{Binding isJoined}" />
-                    <GridViewColumn Header="Bot" DisplayMemberBinding="{Binding bot}" />
+                    <GridViewColumn Header="ID" DisplayMemberBinding="{Binding Id}" />
+                    <GridViewColumn Header="Login" DisplayMemberBinding="{Binding Login}" />
+                    <GridViewColumn Header="Name" DisplayMemberBinding="{Binding Name}" />
+                    <GridViewColumn Header="Role" DisplayMemberBinding="{Binding Role}" />
+                    <GridViewColumn Header="Created At" DisplayMemberBinding="{Binding CreatedAtFormatted}" />
+                    <GridViewColumn Header="View Time" DisplayMemberBinding="{Binding TotalViewTimeFormatted}" />
+                    <GridViewColumn Header="Joined At" DisplayMemberBinding="{Binding JoinTimeFormatted}" />
+                    <GridViewColumn Header="Parted At" DisplayMemberBinding="{Binding PartTimeFormatted}" />
+                    <GridViewColumn Header="First Message" DisplayMemberBinding="{Binding FirstMessageTimeReport}" />
+                    <GridViewColumn Header="Last Message" DisplayMemberBinding="{Binding LastMessageTimeFormatted}" />
+                    <GridViewColumn Header="Messages" DisplayMemberBinding="{Binding NumMessagesReport}" />
+                    <GridViewColumn Header="Timeout" DisplayMemberBinding="{Binding TimeoutFormatted}" />
+                    <GridViewColumn Header="Banned" DisplayMemberBinding="{Binding IsBanned}" />
+                    <GridViewColumn Header="Joined" DisplayMemberBinding="{Binding IsJoined}" />
+                    <GridViewColumn Header="Bot" DisplayMemberBinding="{Binding Bot}" />
                 </GridView>
             </ListView.View>
         </ListView>

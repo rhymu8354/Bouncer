@@ -22,6 +22,7 @@ if(MSVC)
         Model/Configuration.cs
         Model/Main.cs
         Model/Message.cs
+        Model/User.cs
         ObservableStdVector.cs
         Properties/AssemblyInfo.cs
         Properties/Resources.resx

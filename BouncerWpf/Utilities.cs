@@ -9,7 +9,24 @@ using System.Threading.Tasks;
 namespace Bouncer.Wpf {
 
     public static class Utilities {
+        #region Public Properties
+
+        static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
+
+        #endregion
+
         #region Public Methods
+
+        public static string FormatAbsoluteTime(double seconds) {
+            if (seconds == 0.0) {
+                return "-";
+            }
+            var dateTime = new DateTime(
+                (long)(seconds * 10000000.0)
+                + UnixEpoch.Ticks
+            );
+            return dateTime.ToString("u");
+        }
 
         public static string FormatDeltaTime(double seconds) {
             double days = seconds / 86400.0;

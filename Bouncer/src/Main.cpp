@@ -569,6 +569,18 @@ namespace Bouncer {
                         user.bot = User::Bot::No;
                     }
                 }
+                if (userEncoded.Has("role")) {
+                    const auto role = (std::string)userEncoded["role"];
+                    if (role == "broadcaster") {
+                        user.role = User::Role::Broadcaster;
+                    } else if (role == "moderator") {
+                        user.role = User::Role::Moderator;
+                    } else if (role == "vip") {
+                        user.role = User::Role::VIP;
+                    } else if (role == "pleb") {
+                        user.role = User::Role::Pleb;
+                    }
+                }
                 userIdsByLogin[user.login] = userid;
             }
             configurationChanged = true;
@@ -676,9 +688,13 @@ namespace Bouncer {
                     }
                     user.lastMessageTime = messageTime;
                     ++user.numMessages;
+                    ++user.numMessagesThisInstance;
                     UserSeen(user, messageTime);
                     if (user.firstMessageTime == 0.0) {
                         user.firstMessageTime = messageTime;
+                    }
+                    if (user.firstMessageTimeThisInstance == 0.0) {
+                        user.firstMessageTimeThisInstance = messageTime;
                     }
                     diagnosticsSender.SendDiagnosticInformationFormatted(
                         3,
@@ -688,9 +704,6 @@ namespace Bouncer {
                         user.numMessages,
                         user.lastMessageTime
                     );
-                    if (!user.isJoined) {
-                        UserJoined(userid, messageTime);
-                    }
                 }
             }
         }
@@ -1107,6 +1120,25 @@ namespace Bouncer {
 
                     case User::Bot::No: {
                         userEncoded["bot"] = "no";
+                    } break;
+
+                    default: break;
+                }
+                switch (user.role) {
+                    case User::Role::Broadcaster: {
+                        userEncoded["role"] = "broadcaster";
+                    } break;
+
+                    case User::Role::Moderator: {
+                        userEncoded["role"] = "moderator";
+                    } break;
+
+                    case User::Role::VIP: {
+                        userEncoded["role"] = "vip";
+                    } break;
+
+                    case User::Role::Pleb: {
+                        userEncoded["role"] = "pleb";
                     } break;
 
                     default: break;
