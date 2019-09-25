@@ -35,6 +35,8 @@ if(MSVC)
         ${CMAKE_CURRENT_BINARY_DIR}/ModulePINVOKE.cs
         ${CMAKE_CURRENT_BINARY_DIR}/Stats.cs
         ${CMAKE_CURRENT_BINARY_DIR}/StdVectorString.cs
+        ${CMAKE_CURRENT_BINARY_DIR}/User.cs
+        ${CMAKE_CURRENT_BINARY_DIR}/Users.cs
     )
     set_source_files_properties(${Source} PROPERTIES
         GENERATED 1

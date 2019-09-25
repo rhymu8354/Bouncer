@@ -34,6 +34,7 @@
 #include <SystemAbstractions/File.hpp>
 #include <SystemAbstractions/NetworkConnection.hpp>
 #include <SystemAbstractions/StringExtensions.hpp>
+#include <vector>
 
 namespace {
 
@@ -379,28 +380,6 @@ namespace Bouncer {
                 }
             }
 
-        };
-
-        struct User {
-            intmax_t id = 0;
-            std::string login;
-            std::string name;
-            double createdAt = 0.0;
-            double totalViewTime = 0.0;
-            double joinTime = 0.0;
-            double partTime = 0.0;
-            double firstSeenTime = 0.0;
-            double firstMessageTime = 0.0;
-            double lastMessageTime = 0.0;
-            size_t numMessages = 0;
-            double timeout = 0.0;
-            bool isBanned = false;
-            bool isJoined = false;
-            enum class Bot {
-                Unknown,
-                Yes,
-                No,
-            } bot = Bot::Unknown;
         };
 
         // Properties
@@ -1395,6 +1374,25 @@ namespace Bouncer {
         statsSnapshot.totalViewTimeRecorded += viewTimerTotalTime;
         statsSnapshot.totalViewTimeRecordedThisInstance += viewTimerTotalTime;
         return statsSnapshot;
+    }
+
+    std::vector< User > Main::GetUsers() {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        const auto now = impl_->timeKeeper->GetCurrentTime();
+        const auto viewTimerTotalTime = (
+            impl_->viewTimerRunning
+            ? now - impl_->viewTimerStart
+            : 0.0
+        );
+        std::vector< User > users;
+        for (const auto& usersByIdEntry: impl_->usersById) {
+            auto userSnapshot = usersByIdEntry.second;
+            if (userSnapshot.isJoined) {
+                userSnapshot.totalViewTime += viewTimerTotalTime;
+            }
+            users.push_back(std::move(userSnapshot));
+        }
+        return users;
     }
 
     void Main::SetConfiguration(const Configuration& configuration) {

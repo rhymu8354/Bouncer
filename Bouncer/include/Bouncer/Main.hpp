@@ -11,7 +11,9 @@
 #include <Bouncer/Configuration.hpp>
 #include <Bouncer/Host.hpp>
 #include <Bouncer/Stats.hpp>
+#include <Bouncer/User.hpp>
 #include <memory>
+#include <vector>
 
 namespace Bouncer {
 
@@ -38,6 +40,8 @@ namespace Bouncer {
         Configuration GetConfiguration();
 
         Stats GetStats();
+
+        std::vector< User > GetUsers();
 
         void SetConfiguration(const Configuration& configuration);
 

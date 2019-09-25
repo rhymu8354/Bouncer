@@ -18,13 +18,37 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Menu Grid.Row="0">
-            <MenuItem Header="_App" Width="50">
+            <MenuItem Header="_App">
                 <MenuItem Header="_Configuration" Command="local:Commands.Configure" />
                 <Separator />
                 <MenuItem Header="E_xit" ToolTip="Close the Application" Command="local:Commands.Exit" InputGestureText="Alt+F4" />
             </MenuItem>
-            <MenuItem Header="_Viewers" Width="50">
+            <MenuItem Header="_Channel">
                 <MenuItem Header="_View Timer" IsCheckable="True" IsChecked="{Binding ViewTimerRunning}" />
+            </MenuItem>
+            <MenuItem Header="_Viewers">
+                <MenuItem Header="Show _All Viewers" IsCheckable="True" IsChecked="{Binding ShowAllViewers}" />
+                <Separator />
+                <MenuItem Header="Show Known _Bots" IsCheckable="True" IsChecked="{Binding ShowKnownBotViewers}" />
+                <MenuItem Header="Show Possible Bots" IsCheckable="True" IsChecked="{Binding ShowPossibleBotViewers}" />
+                <MenuItem Header="Show Non-Bots" IsCheckable="True" IsChecked="{Binding ShowNonBotViewers}" />
+                <Separator />
+                <MenuItem Header="Show Ba_nned Viewers" IsCheckable="True" IsChecked="{Binding ShowBannedViewers}" />
+                <MenuItem Header="Show _Timed-Out Viewers" IsCheckable="True" IsChecked="{Binding ShowTimedOutViewers}" />
+                <MenuItem Header="Show Non-Timed-Out Viewers" IsCheckable="True" IsChecked="{Binding ShowNonTimedOutViewers}" />
+                <Separator />
+                <MenuItem Header="Show _Moderators" IsCheckable="True" IsChecked="{Binding ShowModViewers}" />
+                <MenuItem Header="Show _VIPs" IsCheckable="True" IsChecked="{Binding ShowVipViewers}" />
+                <MenuItem Header="Show _Plebs" IsCheckable="True" IsChecked="{Binding ShowPlebViewers}" />
+                <Separator />
+                <MenuItem Header="Show Current Viewers" IsCheckable="True" IsChecked="{Binding ShowCurrentViewers}" />
+                <MenuItem Header="Show Missing Viewers" IsCheckable="True" IsChecked="{Binding ShowMissingViewers}" />
+                <MenuItem Header="Show _Lurkers" IsCheckable="True" IsChecked="{Binding ShowLurkingViewers}" />
+                <MenuItem Header="Show _Chatters" IsCheckable="True" IsChecked="{Binding ShowChattingViewers}" />
+                <MenuItem Header="Show _Recent Chatters" IsCheckable="True" IsChecked="{Binding ShowRecentlyChattingViewers}" />
+                <Separator />
+                <MenuItem Header="Show _Whitelisted Viewers" IsCheckable="True" IsChecked="{Binding ShowWhitelistedViewers}" />
+                <MenuItem Header="Show Non-Whitelisted Viewers" IsCheckable="True" IsChecked="{Binding ShowNonWhitelistedViewers}" />
             </MenuItem>
         </Menu>
         <Grid Grid.Row="1">

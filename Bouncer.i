@@ -14,6 +14,7 @@
 #include <Bouncer/Host.hpp>
 #include <Bouncer/Main.hpp>
 #include <Bouncer/Stats.hpp>
+#include <Bouncer/User.hpp>
 %}
 
 %include <stdint.i>
@@ -34,6 +35,7 @@
 // of dependencies (if A depends on B, list B first and then A).
 // -------
 %include "Bouncer/include/Bouncer/Stats.hpp"
+%include "Bouncer/include/Bouncer/User.hpp"
 
 %include "Bouncer/include/Bouncer/Configuration.hpp"
 %include "Bouncer/include/Bouncer/Host.hpp"
@@ -42,3 +44,4 @@
 // -------
 
 %template(StdVectorString) std::vector< std::string >;
+%template(Users) std::vector< Bouncer::User >;
