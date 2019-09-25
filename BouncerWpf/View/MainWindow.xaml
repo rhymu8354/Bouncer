@@ -36,10 +36,10 @@
                 <RowDefinition Height="auto" />
                 <RowDefinition Height="auto" />
             </Grid.RowDefinitions>
-            <Label Grid.Row="0" Grid.Column="0" HorizontalAlignment="Right" Content="Time:" />
-            <Label Content="{Binding TimeReport}" Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" />
-            <Label Grid.Row="1" Grid.Column="0" HorizontalAlignment="Right" Content="Viewers:" />
-            <Label Content="{Binding ViewersReport}" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" />
+            <Label Grid.Row="0" Grid.Column="0" HorizontalAlignment="Right" Content="Time:" Padding="5,0" />
+            <Label Content="{Binding TimeReport}" Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" Padding="5,0" />
+            <Label Grid.Row="1" Grid.Column="0" HorizontalAlignment="Right" Content="Viewers:" Padding="5,0" />
+            <Label Content="{Binding ViewersReport}" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Padding="5,0" />
         </Grid>
         <ListBox
             Grid.Row="2"
