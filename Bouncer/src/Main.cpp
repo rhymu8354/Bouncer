@@ -1417,6 +1417,9 @@ namespace Bouncer {
         impl_->PostStatus("Stopping");
         impl_->StopWorker();
         impl_->StopDiagnosticsWorker();
+        if (impl_->logFileWriter != NULL) {
+            (void)fclose(impl_->logFileWriter);
+        }
     }
     Main::Main(Main&&) noexcept = default;
     Main& Main::operator=(Main&&) noexcept = default;
@@ -1501,12 +1504,15 @@ namespace Bouncer {
         (void)strftime(buffer, sizeof(buffer), "/Bouncer-%Y%m%d%H%M%S.log", gmtime(&startTime));
         const auto logFilePath = SystemAbstractions::File::GetExeParentDirectory() + buffer;
         impl_->logFileWriter = fopen(logFilePath.c_str(), "wt");
-        impl_->diagnosticsSender.SubscribeToDiagnostics(
-            SystemAbstractions::DiagnosticsStreamReporter(
-                impl_->logFileWriter,
-                impl_->logFileWriter
-            )
-        );
+        if (impl_->logFileWriter != NULL) {
+            setbuf(impl_->logFileWriter, NULL);
+            impl_->diagnosticsSender.SubscribeToDiagnostics(
+                SystemAbstractions::DiagnosticsStreamReporter(
+                    impl_->logFileWriter,
+                    impl_->logFileWriter
+                )
+            );
+        }
         impl_->host = host;
         impl_->PostStatus("Starting");
         impl_->StartDiagnosticsWorker();
