@@ -27,10 +27,12 @@
 #include <stdint.h>
 #include <string>
 #include <thread>
+#include <time.h>
 #include <TlsDecorator/TlsDecorator.hpp>
 #include <Twitch/Messaging.hpp>
 #include <TwitchNetworkTransport/Connection.hpp>
 #include <SystemAbstractions/DiagnosticsSender.hpp>
+#include <SystemAbstractions/DiagnosticsStreamReporter.hpp>
 #include <SystemAbstractions/File.hpp>
 #include <SystemAbstractions/NetworkConnection.hpp>
 #include <SystemAbstractions/StringExtensions.hpp>
@@ -391,6 +393,7 @@ namespace Bouncer {
         std::mutex diagnosticsMutex;
         SystemAbstractions::DiagnosticsSender diagnosticsSender;
         std::thread diagnosticsWorker;
+        FILE* logFileWriter = NULL;
         std::shared_ptr< Host > host;
         std::shared_ptr< Http::Client > httpClient = std::make_shared< Http::Client >();
 
@@ -1463,6 +1466,21 @@ namespace Bouncer {
 
     void Main::StartApplication(std::shared_ptr< Host > host) {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        if (impl_->worker.joinable()) {
+            return;
+        }
+        time_t startTime;
+        (void)time(&startTime);
+        char buffer[28];
+        (void)strftime(buffer, sizeof(buffer), "/Bouncer-%Y%m%d%H%M%S.log", gmtime(&startTime));
+        const auto logFilePath = SystemAbstractions::File::GetExeParentDirectory() + buffer;
+        impl_->logFileWriter = fopen(logFilePath.c_str(), "wt");
+        impl_->diagnosticsSender.SubscribeToDiagnostics(
+            SystemAbstractions::DiagnosticsStreamReporter(
+                impl_->logFileWriter,
+                impl_->logFileWriter
+            )
+        );
         impl_->host = host;
         impl_->PostStatus("Starting");
         impl_->StartDiagnosticsWorker();
