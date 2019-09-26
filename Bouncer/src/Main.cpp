@@ -696,6 +696,7 @@ namespace Bouncer {
                     if (user.firstMessageTimeThisInstance == 0.0) {
                         user.firstMessageTimeThisInstance = messageTime;
                     }
+                    UpdateRole(user, messageInfo.tags.badges);
                     diagnosticsSender.SendDiagnosticInformationFormatted(
                         3,
                         "Twitch user %" PRIdMAX " (%s) sent message #%zu at %lf",
@@ -1189,6 +1190,28 @@ namespace Bouncer {
             }
             NotifyStopWorker();
             worker.join();
+        }
+
+        void UpdateRole(
+            User& user,
+            const std::set< std::string >& badges
+        ) {
+            for (const auto& badge: badges) {
+                const auto badgeParts = SystemAbstractions::Split(badge, '/');
+                if (badgeParts.size() >= 1) {
+                    if (badgeParts[0] == "vip") {
+                        user.role = User::Role::VIP;
+                        return;
+                    } else if (badgeParts[0] == "moderator") {
+                        user.role = User::Role::Moderator;
+                        return;
+                    } else if (badgeParts[0] == "broadcaster") {
+                        user.role = User::Role::Broadcaster;
+                        return;
+                    }
+                }
+            }
+            user.role = User::Role::Pleb;
         }
 
         void UserParted(
