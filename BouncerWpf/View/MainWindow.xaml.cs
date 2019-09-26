@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
@@ -48,6 +49,41 @@ namespace Bouncer.Wpf.View {
             Close();
         }
 
+        private void OnSortUsers(object sender, RoutedEventArgs e) {
+            var newSortHeader = sender as GridViewColumnHeader;
+            var tag = newSortHeader.Tag.ToString();
+            UsersList.Items.SortDescriptions.Clear();
+            ListSortDirection sortDirection = (
+                (
+                    (tag == "Role")
+                    || (tag == "CreatedAt")
+                    || (tag == "TotalViewTime")
+                    || (tag == "JoinTime")
+                    || (tag == "PartTime")
+                    || (tag == "LastMessageTime")
+                    || (tag == "NumMessages")
+                    || (tag == "IsJoined")
+                )
+                ? ListSortDirection.Descending
+                : ListSortDirection.Ascending
+            );
+            if (SortHeader != null) {
+                AdornerLayer.GetAdornerLayer(SortHeader).Remove(UserListSortAdorner);
+            }
+            if (newSortHeader == SortHeader) {
+                sortDirection = (
+                    (UserListSortAdorner.Direction == ListSortDirection.Ascending)
+                    ? ListSortDirection.Descending
+                    : ListSortDirection.Ascending
+                );
+            } else {
+                SortHeader = newSortHeader;
+            }
+            UserListSortAdorner = new SortAdorner(SortHeader, sortDirection);
+            AdornerLayer.GetAdornerLayer(SortHeader).Add(UserListSortAdorner);
+            UsersList.Items.SortDescriptions.Add(new SortDescription(tag, sortDirection));
+        }
+
         #endregion
 
         #region Private Properties
@@ -64,6 +100,9 @@ namespace Bouncer.Wpf.View {
                 model_ = value;
             }
         }
+
+        private GridViewColumnHeader SortHeader { get; set; }
+        private SortAdorner UserListSortAdorner { get; set; }
 
         #endregion
     }

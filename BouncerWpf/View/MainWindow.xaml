@@ -67,26 +67,87 @@
             <Label Content="{Binding ViewersReport}" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Padding="5,0" />
         </Grid>
         <ListView
+            x:Name="UsersList"
             Grid.Row="2"
             ItemsSource="{Binding Users}"
         >
             <ListView.View>
                 <GridView>
-                    <GridViewColumn Header="ID" DisplayMemberBinding="{Binding Id}" />
-                    <GridViewColumn Header="Login" DisplayMemberBinding="{Binding Login}" />
-                    <GridViewColumn Header="Name" DisplayMemberBinding="{Binding Name}" />
-                    <GridViewColumn Header="Role" DisplayMemberBinding="{Binding Role}" />
-                    <GridViewColumn Header="Created At" DisplayMemberBinding="{Binding CreatedAtFormatted}" />
-                    <GridViewColumn Header="View Time" DisplayMemberBinding="{Binding TotalViewTimeFormatted}" />
-                    <GridViewColumn Header="Joined At" DisplayMemberBinding="{Binding JoinTimeFormatted}" />
-                    <GridViewColumn Header="Parted At" DisplayMemberBinding="{Binding PartTimeFormatted}" />
-                    <GridViewColumn Header="First Message" DisplayMemberBinding="{Binding FirstMessageTimeReport}" />
-                    <GridViewColumn Header="Last Message" DisplayMemberBinding="{Binding LastMessageTimeFormatted}" />
-                    <GridViewColumn Header="Messages" DisplayMemberBinding="{Binding NumMessagesReport}" />
-                    <GridViewColumn Header="Timeout" DisplayMemberBinding="{Binding TimeoutFormatted}" />
-                    <GridViewColumn Header="Banned" DisplayMemberBinding="{Binding IsBanned}" />
-                    <GridViewColumn Header="Joined" DisplayMemberBinding="{Binding IsJoined}" />
-                    <GridViewColumn Header="Bot" DisplayMemberBinding="{Binding Bot}" />
+                    <GridViewColumn DisplayMemberBinding="{Binding Id}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="Id">ID</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding Login}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="Login">Login</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding Name}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="Name">Name</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding Role}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="Role">Role</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding CreatedAtFormatted}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="CreatedAt">Created At</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding TotalViewTimeFormatted}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="TotalViewTime">View Time</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding JoinTimeFormatted}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="JoinTime">Joined At</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding PartTimeFormatted}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="PartTime">Parted At</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding FirstMessageTimeReport}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="FirstMessageTimeThisInstance">First Message</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding LastMessageTimeFormatted}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="LastMessageTime">Last Message</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding NumMessagesReport}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="NumMessages">Messages</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding TimeoutFormatted}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="Timeout">Timeout</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding IsBanned}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="IsBanned">Banned</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding IsJoined}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="IsJoined">Joined</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding Bot}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="Bot">Bot</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
                 </GridView>
             </ListView.View>
         </ListView>
