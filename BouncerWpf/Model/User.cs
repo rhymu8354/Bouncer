@@ -9,20 +9,11 @@ using System.Threading.Tasks;
 using System.Windows;
 
 namespace Bouncer.Wpf.Model {
-    public class User: IDisposable {
+    public class User: INotifyPropertyChanged {
         #region Public Properties
 
-        public Bouncer.User.Bot Bot {
-            get {
-                return Native.bot;
-            }
-        }
-
-        public double CreatedAt {
-            get {
-                return Native.createdAt;
-            }
-        }
+        public Bouncer.User.Bot Bot { get; private set; }
+        public double CreatedAt { get; private set; }
 
         public string CreatedAtFormatted {
             get {
@@ -30,11 +21,7 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
-        public double FirstMessageTime {
-            get {
-                return Native.firstMessageTime;
-            }
-        }
+        public double FirstMessageTime { get; private set; }
 
         public string FirstMessageTimeFormatted {
             get {
@@ -52,11 +39,7 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
-        public double FirstMessageTimeThisInstance {
-            get {
-                return Native.firstMessageTimeThisInstance;
-            }
-        }
+        public double FirstMessageTimeThisInstance { get; private set; }
 
         public string FirstMessageTimeThisInstanceFormatted {
             get {
@@ -64,29 +47,10 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
-        public long Id {
-            get {
-                return Native.id;
-            }
-        }
-
-        public bool IsBanned {
-            get {
-                return Native.isBanned;
-            }
-        }
-
-        public bool IsJoined {
-            get {
-                return Native.isJoined;
-            }
-        }
-
-        public double JoinTime {
-            get {
-                return Native.joinTime;
-            }
-        }
+        public long Id { get; private set; }
+        public bool IsBanned { get; private set; }
+        public bool IsJoined { get; private set; }
+        public double JoinTime { get; private set; }
 
         public string JoinTimeFormatted {
             get {
@@ -94,11 +58,7 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
-        public double LastMessageTime {
-            get {
-                return Native.lastMessageTime;
-            }
-        }
+        public double LastMessageTime { get; private set; }
 
         public string LastMessageTimeFormatted {
             get {
@@ -106,38 +66,9 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
-        public string Login {
-            get {
-                return Native.login;
-            }
-        }
-
-        public string Name {
-            get {
-                return Native.name;
-            }
-        }
-
-        private Bouncer.User native_;
-        public Bouncer.User Native {
-            get {
-                return native_;
-            }
-            private set {
-                if (Native != value) {
-                    if (Native != null) {
-                        Native.Dispose();
-                    }
-                    native_ = value;
-                }
-            }
-        }
-
-        public double PartTime {
-            get {
-                return Native.partTime;
-            }
-        }
+        public string Login { get; private set; }
+        public string Name { get; private set; }
+        public double PartTime { get; private set; }
 
         public string PartTimeFormatted {
             get {
@@ -145,11 +76,7 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
-        public double TotalViewTime {
-            get {
-                return Native.totalViewTime;
-            }
-        }
+        public double TotalViewTime { get; private set; }
 
         public string TotalViewTimeFormatted {
             get {
@@ -157,17 +84,8 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
-        public uint NumMessages {
-            get {
-                return Native.numMessages;
-            }
-        }
-
-        public uint NumMessagesThisInstance {
-            get {
-                return Native.numMessagesThisInstance;
-            }
-        }
+        public uint NumMessages { get; private set; }
+        public uint NumMessagesThisInstance { get; private set; }
 
         public string NumMessagesReport {
             get {
@@ -179,17 +97,8 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
-        public Bouncer.User.Role Role {
-            get {
-                return Native.role;
-            }
-        }
-
-        public double Timeout {
-            get {
-                return Native.timeout;
-            }
-        }
+        public Bouncer.User.Role Role { get; private set; }
+        public double Timeout { get; private set; }
 
         public string TimeoutFormatted {
             get {
@@ -202,35 +111,124 @@ namespace Bouncer.Wpf.Model {
         #region Public Methods
 
         public User(Bouncer.User native) {
-            Native = native;
+            Bot = native.bot;
+            CreatedAt = native.createdAt;
+            FirstMessageTime = native.firstMessageTime;
+            FirstMessageTimeThisInstance = native.firstMessageTimeThisInstance;
+            Id = native.id;
+            IsBanned = native.isBanned;
+            IsJoined = native.isJoined;
+            JoinTime = native.joinTime;
+            LastMessageTime = native.lastMessageTime;
+            Login = native.login;
+            Name = native.name;
+            PartTime = native.partTime;
+            TotalViewTime = native.totalViewTime;
+            NumMessages = native.numMessages;
+            NumMessagesThisInstance = native.numMessagesThisInstance;
+            Role = native.role;
+            Timeout = native.timeout;
         }
 
-        #endregion
-
-        #region IDisposable
-
-        public void Dispose() {
-            Dispose(true);
-        }
-
-        #endregion
-
-        #region Protected Methods
-
-        protected virtual void Dispose(bool disposing) {
-            if (!Disposed) {
-                if (disposing) {
-                    Native = null;
+        public void Update(Bouncer.User native) {
+            if (Bot != native.bot) {
+                Bot = native.bot;
+                NotifyPropertyChanged("Bot");
+            }
+            if (CreatedAt != native.createdAt) {
+                CreatedAt = native.createdAt;
+                NotifyPropertyChanged("CreatedAt");
+                NotifyPropertyChanged("CreatedAtFormatted");
+            }
+            if (FirstMessageTime != native.firstMessageTime) {
+                FirstMessageTime = native.firstMessageTime;
+                NotifyPropertyChanged("FirstMessageTime");
+                NotifyPropertyChanged("FirstMessageTimeFormatted");
+                if (FirstMessageTimeThisInstance == native.firstMessageTimeThisInstance) {
+                    NotifyPropertyChanged("FirstMessageTimeReport");
                 }
-                Disposed = true;
+            }
+            if (FirstMessageTimeThisInstance != native.firstMessageTimeThisInstance) {
+                FirstMessageTimeThisInstance = native.firstMessageTimeThisInstance;
+                NotifyPropertyChanged("FirstMessageTimeThisInstance");
+                NotifyPropertyChanged("FirstMessageTimeReport");
+            }
+            if (Id != native.id) {
+                Id = native.id;
+                NotifyPropertyChanged("Id");
+            }
+            if (IsBanned != native.isBanned) {
+                IsBanned = native.isBanned;
+                NotifyPropertyChanged("IsBanned");
+            }
+            if (IsJoined != native.isJoined) {
+                IsJoined = native.isJoined;
+                NotifyPropertyChanged("IsJoined");
+            }
+            if (JoinTime != native.joinTime) {
+                JoinTime = native.joinTime;
+                NotifyPropertyChanged("JoinTime");
+                NotifyPropertyChanged("JoinTimeFormatted");
+            }
+            if (LastMessageTime != native.lastMessageTime) {
+                LastMessageTime = native.lastMessageTime;
+                NotifyPropertyChanged("LastMessageTime");
+                NotifyPropertyChanged("LastMessageTimeFormatted");
+            }
+            if (Login != native.login) {
+                Login = native.login;
+                NotifyPropertyChanged("Login");
+            }
+            if (Name != native.name) {
+                Name = native.name;
+                NotifyPropertyChanged("Name");
+            }
+            if (PartTime != native.partTime) {
+                PartTime = native.partTime;
+                NotifyPropertyChanged("PartTime");
+                NotifyPropertyChanged("PartTimeFormatted");
+            }
+            if (TotalViewTime != native.totalViewTime) {
+                TotalViewTime = native.totalViewTime;
+                NotifyPropertyChanged("TotalViewTime");
+                NotifyPropertyChanged("TotalViewTimeFormatted");
+            }
+            if (NumMessages != native.numMessages) {
+                NumMessages = native.numMessages;
+                NotifyPropertyChanged("NumMessages");
+                if (NumMessagesThisInstance != native.numMessagesThisInstance) {
+                    NotifyPropertyChanged("NumMessagesReport");
+                }
+            }
+            if (NumMessagesThisInstance != native.numMessagesThisInstance) {
+                NumMessagesThisInstance = native.numMessagesThisInstance;
+                NotifyPropertyChanged("NumMessagesThisInstance");
+                NotifyPropertyChanged("NumMessagesReport");
+            }
+            if (Role != native.role) {
+                Role = native.role;
+                NotifyPropertyChanged("Role");
+            }
+            if (Timeout != native.timeout) {
+                Timeout = native.timeout;
+                NotifyPropertyChanged("Timeout");
+                NotifyPropertyChanged("TimeoutFormatted");
             }
         }
 
         #endregion
 
-        #region Private Properties
+        #region INotifyPropertyChanged
 
-        private bool Disposed { get; set; } = false;
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        #endregion
+
+        #region Private Methods
+
+        private void NotifyPropertyChanged(string propertyName) {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
         #endregion
     }

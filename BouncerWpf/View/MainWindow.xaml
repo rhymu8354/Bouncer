@@ -70,6 +70,7 @@
             x:Name="UsersList"
             Grid.Row="2"
             ItemsSource="{Binding Users}"
+            SelectedItem="{Binding SelectedUser}"
         >
             <ListView.View>
                 <GridView>

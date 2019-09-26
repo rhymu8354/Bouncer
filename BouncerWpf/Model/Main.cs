@@ -86,93 +86,7 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
-        public IEnumerable<User> Users {
-            get {
-                if (NativeUsers != null) {
-                    foreach (var nativeUser in NativeUsers) {
-                        bool show = false;
-                        if (ShowAllViewers) {
-                            show = true;
-                        } else {
-                            switch (nativeUser.bot) {
-                                case Bouncer.User.Bot.Yes:
-                                    if (ShowKnownBotViewers) show = true;
-                                    break;
-
-                                case Bouncer.User.Bot.No:
-                                    if (ShowNonBotViewers) show = true;
-                                    break;
-
-                                default:
-                                    if (ShowPossibleBotViewers) show = true;
-                                    break;
-                            }
-                            if (!show) continue;
-                            show = false;
-                            if (nativeUser.isBanned) {
-                                if (ShowBannedViewers) show = true;
-                            } else if (nativeUser.timeout != 0.0) {
-                                if (ShowTimedOutViewers) show = true;
-                            } else {
-                                if (ShowNonTimedOutViewers) show = true;
-                            }
-                            if (!show) continue;
-                            show = false;
-                            switch (nativeUser.role) {
-                                case Bouncer.User.Role.Broadcaster:
-                                case Bouncer.User.Role.Moderator:
-                                    if (ShowModViewers) show = true;
-                                    break;
-
-                                case Bouncer.User.Role.VIP:
-                                    if (ShowVipViewers) show = true;
-                                    break;
-
-                                case Bouncer.User.Role.Regular:
-                                    if (ShowRegularViewers) show = true;
-                                    break;
-
-                                case Bouncer.User.Role.Pleb:
-                                    if (ShowPlebViewers) show = true;
-                                    break;
-
-                                default:
-                                    if (ShowUnknownViewers) show = true;
-                                    break;
-                            }
-                            if (!show) continue;
-                            show = false;
-                            if (nativeUser.isJoined) {
-                                if (ShowCurrentViewers) show = true;
-                                if (nativeUser.numMessagesThisInstance == 0) {
-                                    if (ShowLurkingViewers) show = true;
-                                } else {
-                                    if (ShowChattingViewers) show = true;
-                                    if (
-                                        ShowRecentlyChattingViewers
-                                        && nativeUser.isRecentChatter
-                                    ) {
-                                        show = true;
-                                    }
-                                }
-                            } else {
-                                if (ShowMissingViewers) show = true;
-                            }
-                            if (!show) continue;
-                            show = false;
-                            if (Configuration.Whitelist.IndexOf(nativeUser.login) >= 0) {
-                                if (ShowWhitelistedViewers) show = true;
-                            } else {
-                                if (ShowNonWhitelistedViewers) show = true;
-                            }
-                        }
-                        if (show) {
-                            yield return new User(nativeUser);
-                        }
-                    }
-                }
-            }
-        }
+        public ObservableCollection<User> Users { get; private set; } = new ObservableCollection<User>();
 
         public string ViewersReport {
             get {
@@ -206,6 +120,29 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        private User selectedUser_;
+        public User SelectedUser {
+            get {
+                return selectedUser_;
+            }
+            set {
+                if (SelectedUser == value) {
+                    return;
+                }
+                selectedUser_ = value;
+                if (SelectedUser == null) {
+                    Trace.WriteLine("Deselected user");
+                } else {
+                    Trace.WriteLine(
+                        String.Format(
+                            "Selected user {0}",
+                            SelectedUser.Id
+                        )
+                    );
+                }
+            }
+        }
+
         private bool showAllViewers_ = true;
         public bool ShowAllViewers {
             get {
@@ -232,7 +169,7 @@ namespace Bouncer.Wpf.Model {
                 ShowWhitelistedViewers = value;
                 ShowNonWhitelistedViewers = value;
                 NotifyPropertyChanged("ShowAllViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -251,7 +188,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowKnownBotViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -270,7 +207,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowPossibleBotViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -289,7 +226,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowNonBotViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -308,7 +245,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowBannedViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -327,7 +264,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowTimedOutViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -346,7 +283,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowNonTimedOutViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -365,7 +302,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowModViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -384,7 +321,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowVipViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -403,7 +340,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowRegularViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -422,7 +359,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowPlebViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -441,7 +378,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowUnknownViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -462,7 +399,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowCurrentViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -481,7 +418,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowMissingViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -502,7 +439,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowCurrentViewers");
                 }
                 NotifyPropertyChanged("ShowLurkingViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -524,7 +461,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowCurrentViewers");
                 }
                 NotifyPropertyChanged("ShowChattingViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -547,7 +484,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowChattingViewers");
                 }
                 NotifyPropertyChanged("ShowRecentlyChattingViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -566,7 +503,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowWhitelistedViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -585,7 +522,7 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowNonWhitelistedViewers");
-                NotifyPropertyChanged("Users");
+                RefreshUsers();
             }
         }
 
@@ -599,7 +536,7 @@ namespace Bouncer.Wpf.Model {
             HostFacet = new Host(this);
             Native.StartApplication(HostFacet);
             Stats = Native.GetStats();
-            NativeUsers = Native.GetUsers();
+            RefreshUsers();
             RefreshTimer.Tick += OnRefreshTimerTick;
             RefreshTimer.Interval = new TimeSpan(0, 0, 1);
             RefreshTimer.Start();
@@ -627,7 +564,6 @@ namespace Bouncer.Wpf.Model {
             if (!Disposed) {
                 if (disposing) {
                     RefreshTimer.Tick -= OnRefreshTimerTick;
-                    NativeUsers = null;
                     Stats = null;
                     Native = null;
                     HostFacet = null;
@@ -640,13 +576,125 @@ namespace Bouncer.Wpf.Model {
 
         #region Private Methods
 
+        private bool FilterUser(Bouncer.User user) {
+            bool show = false;
+            if (ShowAllViewers) {
+                return true;
+            }
+            switch (user.bot) {
+                case Bouncer.User.Bot.Yes:
+                    if (ShowKnownBotViewers) show = true;
+                    break;
+
+                case Bouncer.User.Bot.No:
+                    if (ShowNonBotViewers) show = true;
+                    break;
+
+                default:
+                    if (ShowPossibleBotViewers) show = true;
+                    break;
+            }
+            if (!show) return false;
+            show = false;
+            if (user.isBanned) {
+                if (ShowBannedViewers) show = true;
+            } else if (user.timeout != 0.0) {
+                if (ShowTimedOutViewers) show = true;
+            } else {
+                if (ShowNonTimedOutViewers) show = true;
+            }
+            if (!show) return false;
+            show = false;
+            switch (user.role) {
+                case Bouncer.User.Role.Broadcaster:
+                case Bouncer.User.Role.Moderator:
+                    if (ShowModViewers) show = true;
+                    break;
+
+                case Bouncer.User.Role.VIP:
+                    if (ShowVipViewers) show = true;
+                    break;
+
+                case Bouncer.User.Role.Regular:
+                    if (ShowRegularViewers) show = true;
+                    break;
+
+                case Bouncer.User.Role.Pleb:
+                    if (ShowPlebViewers) show = true;
+                    break;
+
+                default:
+                    if (ShowUnknownViewers) show = true;
+                    break;
+            }
+            if (!show) return false;
+            show = false;
+            if (user.isJoined) {
+                if (ShowCurrentViewers) show = true;
+                if (user.numMessagesThisInstance == 0) {
+                    if (ShowLurkingViewers) show = true;
+                } else {
+                    if (ShowChattingViewers) show = true;
+                    if (
+                        ShowRecentlyChattingViewers
+                        && user.isRecentChatter
+                    ) {
+                        show = true;
+                    }
+                }
+            } else {
+                if (ShowMissingViewers) show = true;
+            }
+            if (!show) return false;
+            show = false;
+            if (Configuration.Whitelist.IndexOf(user.login) >= 0) {
+                if (ShowWhitelistedViewers) show = true;
+            } else {
+                if (ShowNonWhitelistedViewers) show = true;
+            }
+            return show;
+        }
+
         private void NotifyPropertyChanged(string propertyName) {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
         private void OnRefreshTimerTick(object sender, EventArgs e) {
             Stats = Native.GetStats();
-            NativeUsers = Native.GetUsers();
+            RefreshUsers();
+        }
+
+        private void RefreshUsers() {
+            var nativeUsers = Native.GetUsers();
+            var newUsersById = new Dictionary<long, Bouncer.User>();
+            foreach (var user in nativeUsers) {
+                newUsersById[user.id] = user;
+            }
+            var numOldUsers = Users.Count;
+            int i = 0;
+            while (i < numOldUsers) {
+                var oldUser = Users[i];
+                Bouncer.User user;
+                if (newUsersById.TryGetValue(oldUser.Id, out user)) {
+                    if (FilterUser(user)) {
+                        oldUser.Update(user);
+                        ++i;
+                    } else {
+                        Users.RemoveAt(i);
+                        --numOldUsers;
+                    }
+                    newUsersById.Remove(oldUser.Id);
+                } else {
+                    Users.RemoveAt(i);
+                    --numOldUsers;
+                }
+            }
+            foreach (var user in newUsersById.Values) {
+                if (FilterUser(user)) {
+                    Users.Add(new User(user));
+                }
+            }
+            nativeUsers.Dispose();
         }
 
         #endregion
@@ -669,23 +717,6 @@ namespace Bouncer.Wpf.Model {
                     }
                     native_ = value;
                 }
-            }
-        }
-
-        private Bouncer.Users nativeUsers_;
-        private Bouncer.Users NativeUsers {
-            get {
-                return nativeUsers_;
-            }
-            set {
-                if (NativeUsers == value) {
-                    return;
-                }
-                if (NativeUsers != null) {
-                    NativeUsers.Dispose();
-                }
-                nativeUsers_ = value;
-                NotifyPropertyChanged("Users");
             }
         }
 
