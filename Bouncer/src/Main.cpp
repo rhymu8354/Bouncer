@@ -432,6 +432,7 @@ namespace Bouncer {
         double viewTimerStart = 0.0;
         std::condition_variable wakeDiagnosticsWorker;
         std::condition_variable_any wakeWorker;
+        std::set< std::string > whitelistSet;
         std::thread worker;
 
 
@@ -478,6 +479,13 @@ namespace Bouncer {
             (void)wasLoggedOut.wait_for(std::chrono::seconds(1));
         }
 
+        void BuildWhitelistSet() {
+            whitelistSet.clear();
+            for (const auto& whitelistEntry: configuration.whitelist) {
+                (void)whitelistSet.insert(whitelistEntry);
+            }
+        }
+
         void DiagnosticsWorker() {
             std::unique_lock< decltype(diagnosticsMutex) > lock(diagnosticsMutex);
             while (!stopDiagnosticsWorker) {
@@ -491,22 +499,6 @@ namespace Bouncer {
                 wakeDiagnosticsWorker.wait(lock, workerWakeCondition);
             }
             WithoutLock(lock, [&]{ PublishMessages(); });
-        }
-
-        void UserSeen(
-            User& user,
-            double time
-        ) {
-            if (user.firstSeenTime == 0.0) {
-                user.firstSeenTime = time;
-                diagnosticsSender.SendDiagnosticInformationFormatted(
-                    2,
-                    "User %" PRIdMAX " (%s) seen for the first time (%lf)",
-                    user.id,
-                    user.login.c_str(),
-                    time
-                );
-            }
         }
 
         void LoadConfiguration() {
@@ -535,6 +527,7 @@ namespace Bouncer {
             configuration.clientId = (std::string)json["clientId"];
             configuration.channel = (std::string)json["channel"];
             configuration.newAccountAgeThreshold = (double)json["newAccountAgeThreshold"];
+            configuration.recentChatThreshold = (double)json["recentChatThreshold"];
             stats.maxViewerCount = (size_t)json["maxViewerCount"];
             stats.totalViewTimeRecorded = (double)json["totalViewTimeRecorded"];
             const auto& whitelist = json["whitelist"];
@@ -544,6 +537,7 @@ namespace Bouncer {
             for (size_t i = 0; i < numWhitelistEntries; ++i) {
                 configuration.whitelist.push_back((std::string)whitelist[i]);
             }
+            BuildWhitelistSet();
             const auto& users = json["users"];
             userIdsByLogin.clear();
             userJoinsByLogin.clear();
@@ -1085,6 +1079,7 @@ namespace Bouncer {
                 {"clientId", configuration.clientId},
                 {"channel", configuration.channel},
                 {"newAccountAgeThreshold", configuration.newAccountAgeThreshold},
+                {"recentChatThreshold", configuration.recentChatThreshold},
                 {"whitelist", Json::Array({})},
                 {"users", Json::Array({})},
                 {"maxViewerCount", stats.maxViewerCount},
@@ -1214,7 +1209,6 @@ namespace Bouncer {
                     }
                 }
             }
-            user.role = User::Role::Pleb;
         }
 
         void UserParted(
@@ -1289,6 +1283,22 @@ namespace Bouncer {
                 return;
             }
             PostUserLookupsByLogin();
+        }
+
+        void UserSeen(
+            User& user,
+            double time
+        ) {
+            if (user.firstSeenTime == 0.0) {
+                user.firstSeenTime = time;
+                diagnosticsSender.SendDiagnosticInformationFormatted(
+                    2,
+                    "User %" PRIdMAX " (%s) seen for the first time (%lf)",
+                    user.id,
+                    user.login.c_str(),
+                    time
+                );
+            }
         }
 
         void ViewerCountDown() {
@@ -1451,6 +1461,21 @@ namespace Bouncer {
                 );
                 userSnapshot.totalViewTime += viewTimerTotalTime;
             }
+            if (
+                userSnapshot.isJoined
+                && (now - userSnapshot.lastMessageTime < impl_->configuration.recentChatThreshold)
+            ) {
+                userSnapshot.isRecentChatter = true;
+            }
+            if (now - userSnapshot.createdAt < impl_->configuration.newAccountAgeThreshold) {
+                userSnapshot.isNewAccount = true;
+            }
+            if (
+                (userSnapshot.role == User::Role::Pleb)
+                && (impl_->whitelistSet.find(userSnapshot.login) != impl_->whitelistSet.end())
+            ) {
+                userSnapshot.role = User::Role::Regular;
+            }
             users.push_back(std::move(userSnapshot));
         }
         return users;
@@ -1461,6 +1486,7 @@ namespace Bouncer {
         impl_->configuration = configuration;
         impl_->configurationChanged = true;
         impl_->SaveConfiguration();
+        impl_->BuildWhitelistSet();
         impl_->wakeWorker.notify_one();
     }
 

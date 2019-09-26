@@ -34,6 +34,8 @@ namespace Bouncer {
         double timeout = 0.0;
         bool isBanned = false;
         bool isJoined = false;
+        bool isRecentChatter = false;
+        bool isNewAccount = false;
         enum class Bot {
             Unknown,
             Yes,
@@ -42,6 +44,7 @@ namespace Bouncer {
         enum class Role {
             Unknown,
             Pleb,
+            Regular,
             VIP,
             Moderator,
             Broadcaster,

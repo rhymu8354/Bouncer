@@ -18,6 +18,7 @@
             <RowDefinition Height="auto" />
             <RowDefinition Height="auto" />
             <RowDefinition Height="auto" />
+            <RowDefinition Height="auto" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="auto" />
@@ -33,7 +34,9 @@
         <TextBox Text="{Binding Channel}" Grid.Row="3" Grid.Column="1" Width="500" VerticalAlignment="Center" />
         <Label Grid.Row="4" Grid.Column="0" HorizontalAlignment="Right" Content="New account auto-timeout age threshold:" />
         <TextBox Text="{Binding NewAccountAgeThreshold}" Grid.Row="4" Grid.Column="1" Width="500" VerticalAlignment="Center" />
-        <GroupBox Grid.Row="5" Grid.ColumnSpan="2" Header="Whitelist">
+        <Label Grid.Row="5" Grid.Column="0" HorizontalAlignment="Right" Content="Recent chat time threshold:" />
+        <TextBox Text="{Binding RecentChatThreshold}" Grid.Row="5" Grid.Column="1" Width="500" VerticalAlignment="Center" />
+        <GroupBox Grid.Row="6" Grid.ColumnSpan="2" Header="Whitelist">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="auto" />
@@ -78,7 +81,7 @@
                 </Grid>
             </Grid>
         </GroupBox>
-        <Grid Grid.Row="6" Grid.ColumnSpan="2" Margin="20,10">
+        <Grid Grid.Row="7" Grid.ColumnSpan="2" Margin="20,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="auto" />
                 <ColumnDefinition Width="*" />

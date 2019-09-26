@@ -78,6 +78,16 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public double RecentChatThreshold {
+            get {
+                return Adaptee.recentChatThreshold;
+            }
+            set {
+                Adaptee.recentChatThreshold = value;
+                NotifyPropertyChanged("RecentChatThreshold");
+            }
+        }
+
         public ObservableStdVector<StdVectorString, string> Whitelist { get; private set; }
 
         #endregion

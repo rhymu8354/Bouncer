@@ -41,16 +41,15 @@
                 <Separator />
                 <MenuItem Header="Show _Moderators" IsCheckable="True" IsChecked="{Binding ShowModViewers}" />
                 <MenuItem Header="Show _VIPs" IsCheckable="True" IsChecked="{Binding ShowVipViewers}" />
+                <MenuItem Header="Show _Regulars" IsCheckable="True" IsChecked="{Binding ShowRegularViewers}" />
                 <MenuItem Header="Show _Plebs" IsCheckable="True" IsChecked="{Binding ShowPlebViewers}" />
+                <MenuItem Header="Show _Unknown Viewers" IsCheckable="True" IsChecked="{Binding ShowUnknownViewers}" />
                 <Separator />
                 <MenuItem Header="Show Current Viewers" IsCheckable="True" IsChecked="{Binding ShowCurrentViewers}" />
                 <MenuItem Header="Show Missing Viewers" IsCheckable="True" IsChecked="{Binding ShowMissingViewers}" />
                 <MenuItem Header="Show _Lurkers" IsCheckable="True" IsChecked="{Binding ShowLurkingViewers}" />
                 <MenuItem Header="Show _Chatters" IsCheckable="True" IsChecked="{Binding ShowChattingViewers}" />
                 <MenuItem Header="Show _Recent Chatters" IsCheckable="True" IsChecked="{Binding ShowRecentlyChattingViewers}" />
-                <Separator />
-                <MenuItem Header="Show _Whitelisted Viewers" IsCheckable="True" IsChecked="{Binding ShowWhitelistedViewers}" />
-                <MenuItem Header="Show Non-Whitelisted Viewers" IsCheckable="True" IsChecked="{Binding ShowNonWhitelistedViewers}" />
             </MenuItem>
         </Menu>
         <Grid Grid.Row="1">

@@ -22,7 +22,8 @@ namespace Bouncer {
         std::string token;
         std::string clientId;
         std::string channel;
-        double newAccountAgeThreshold = 0.0;
+        double newAccountAgeThreshold = 604800.0;
+        double recentChatThreshold = 1800.0;
         std::vector< std::string > whitelist;
     };
 
