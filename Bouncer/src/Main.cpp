@@ -423,6 +423,7 @@ namespace Bouncer {
         AsyncData::MultiProducerSingleConsumerQueue< StatusMessage > statusMessages;
         bool stopDiagnosticsWorker = false;
         bool stopWorker = false;
+        SystemAbstractions::DiagnosticsSender::UnsubscribeDelegate unsubscribeLogFileWriter;
         std::map< std::string, intmax_t > userIdsByLogin;
         std::map< std::string, double > userJoinsByLogin;
         AsyncData::MultiProducerSingleConsumerQueue< std::string > userLookupsByLogin;
@@ -1417,6 +1418,9 @@ namespace Bouncer {
         impl_->PostStatus("Stopping");
         impl_->StopWorker();
         impl_->StopDiagnosticsWorker();
+        if (impl_->unsubscribeLogFileWriter != nullptr) {
+            impl_->unsubscribeLogFileWriter();
+        }
         if (impl_->logFileWriter != NULL) {
             (void)fclose(impl_->logFileWriter);
         }
@@ -1506,7 +1510,7 @@ namespace Bouncer {
         impl_->logFileWriter = fopen(logFilePath.c_str(), "wt");
         if (impl_->logFileWriter != NULL) {
             setbuf(impl_->logFileWriter, NULL);
-            impl_->diagnosticsSender.SubscribeToDiagnostics(
+            impl_->unsubscribeLogFileWriter = impl_->diagnosticsSender.SubscribeToDiagnostics(
                 SystemAbstractions::DiagnosticsStreamReporter(
                     impl_->logFileWriter,
                     impl_->logFileWriter
