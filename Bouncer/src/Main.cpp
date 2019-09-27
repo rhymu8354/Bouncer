@@ -345,6 +345,7 @@ namespace Bouncer {
                 if (impl == nullptr) {
                     return;
                 }
+                impl->OnClear(std::move(clearInfo));
             }
 
             virtual void Mod(Twitch::Messaging::ModInfo&& modInfo) override {
@@ -593,6 +594,54 @@ namespace Bouncer {
             );
         }
 
+        void HandleClear(
+            Twitch::Messaging::ClearInfo&& clearInfo,
+            double clearTime
+        ) {
+            intmax_t targetUserId = 0;
+            const auto targetUserIdTag = clearInfo.tags.allTags.find("target-user-id");
+            if (
+                (targetUserIdTag == clearInfo.tags.allTags.end())
+                || (sscanf(targetUserIdTag->second.c_str(), "%" SCNdMAX, &targetUserId) != 1)
+            ) {
+                return;
+            }
+            auto usersByIdEntry = usersById.find(targetUserId);
+            if (usersByIdEntry == usersById.end()) {
+                LookupUserById(
+                    targetUserId,
+                    [
+                        clearInfo,
+                        clearTime,
+                        targetUserId
+                    ](Impl& impl){
+                        auto clearInfoCopy = clearInfo;
+                        impl.HandleClear(std::move(clearInfoCopy), clearTime);
+                    }
+                );
+            } else {
+                auto& user = usersByIdEntry->second;
+                if (clearInfo.type == Twitch::Messaging::ClearInfo::Type::Ban) {
+                    diagnosticsSender.SendDiagnosticInformationFormatted(
+                        3,
+                        "Twitch user %" PRIdMAX " (%s) has been banned",
+                        targetUserId,
+                        clearInfo.user.c_str()
+                    );
+                    user.isBanned = true;
+                } else {
+                    diagnosticsSender.SendDiagnosticInformationFormatted(
+                        3,
+                        "Twitch user %" PRIdMAX " (%s) has been timed out for %zu seconds",
+                        targetUserId,
+                        clearInfo.user.c_str(),
+                        clearInfo.duration
+                    );
+                    user.timeout = clearTime + clearInfo.duration;
+                }
+            }
+        }
+
         void HandleConfigurationChanged() {
             const bool isConfigured = (
                 !configuration.account.empty()
@@ -658,7 +707,6 @@ namespace Bouncer {
                     }
                 } else {
                     auto& user = usersByIdEntry->second;
-                    user.id = userid;
                     if (user.login != messageInfo.user) {
                         if (!user.login.empty()) {
                             diagnosticsSender.SendDiagnosticInformationFormatted(
@@ -738,6 +786,7 @@ namespace Bouncer {
                         }
                         impl.userIdsByLogin[login] = userid;
                         auto& user = impl.usersById[userid];
+                        user.id = userid;
                         if (user.login != login) {
                             if (!user.login.empty()) {
                                 impl.diagnosticsSender.SendDiagnosticInformationFormatted(
@@ -797,6 +846,11 @@ namespace Bouncer {
             std::lock_guard< decltype(mutex) > lock(mutex);
             stopWorker = true;
             wakeWorker.notify_one();
+        }
+
+        void OnClear(Twitch::Messaging::ClearInfo&& clearInfo) {
+            std::lock_guard< decltype(mutex) > lock(mutex);
+            HandleClear(std::move(clearInfo), timeKeeper->GetCurrentTime());
         }
 
         void OnLogIn() {
