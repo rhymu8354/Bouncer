@@ -1489,6 +1489,36 @@ namespace Bouncer {
         impl_->twitchDelegate->implWeak = impl_;
     }
 
+    void Main::Ban(intmax_t userid) {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        auto usersByIdEntry = impl_->usersById.find(userid);
+        if (usersByIdEntry == impl_->usersById.end()) {
+            return;
+        }
+        if (impl_->state != Impl::State::InsideRoom) {
+            impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
+                SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                "Unable to ban user %" PRIdMAX " (%s) because we're not in the room",
+                usersByIdEntry->second.id,
+                usersByIdEntry->second.login.c_str()
+            );
+            return;
+        }
+        impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
+            3,
+            "Banning user %" PRIdMAX " (%s)",
+            usersByIdEntry->second.id,
+            usersByIdEntry->second.login.c_str()
+        );
+        impl_->tmi.SendMessage(
+            impl_->configuration.channel,
+            SystemAbstractions::sprintf(
+                "/ban %s",
+                usersByIdEntry->second.login.c_str()
+            )
+        );
+    }
+
     Configuration Main::GetConfiguration() {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
         return impl_->configuration;
@@ -1610,6 +1640,37 @@ namespace Bouncer {
                 user.totalViewTime += (now - user.joinTime);
             }
         }
+    }
+
+    void Main::Unban(intmax_t userid) {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        auto usersByIdEntry = impl_->usersById.find(userid);
+        if (usersByIdEntry == impl_->usersById.end()) {
+            return;
+        }
+        usersByIdEntry->second.isBanned = false;
+        if (impl_->state != Impl::State::InsideRoom) {
+            impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
+                SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                "Unable to unban user %" PRIdMAX " (%s) because we're not in the room",
+                usersByIdEntry->second.id,
+                usersByIdEntry->second.login.c_str()
+            );
+            return;
+        }
+        impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
+            3,
+            "Unbanning user %" PRIdMAX " (%s)",
+            usersByIdEntry->second.id,
+            usersByIdEntry->second.login.c_str()
+        );
+        impl_->tmi.SendMessage(
+            impl_->configuration.channel,
+            SystemAbstractions::sprintf(
+                "/unban %s",
+                usersByIdEntry->second.login.c_str()
+            )
+        );
     }
 
 }

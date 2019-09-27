@@ -542,6 +542,14 @@ namespace Bouncer.Wpf.Model {
             RefreshTimer.Start();
         }
 
+        public void Ban(User user) {
+            Native.Ban(user.Id);
+        }
+
+        public void Unban(User user) {
+            Native.Unban(user.Id);
+        }
+
         #endregion
 
         #region INotifyPropertyChanged

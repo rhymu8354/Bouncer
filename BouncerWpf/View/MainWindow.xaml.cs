@@ -35,6 +35,14 @@ namespace Bouncer.Wpf.View {
 
         #region Private Methods
 
+        private void OnBan(object sender, ExecutedRoutedEventArgs e) {
+            var user = e.Parameter as Model.User;
+            if (user == null) {
+                return;
+            }
+            Model.Ban(user);
+        }
+
         private void OnClosed(object sender, EventArgs e) {
             Model = null;
         }
@@ -82,6 +90,14 @@ namespace Bouncer.Wpf.View {
             UserListSortAdorner = new SortAdorner(SortHeader, sortDirection);
             AdornerLayer.GetAdornerLayer(SortHeader).Add(UserListSortAdorner);
             UsersList.Items.SortDescriptions.Add(new SortDescription(tag, sortDirection));
+        }
+
+        private void OnUnban(object sender, ExecutedRoutedEventArgs e) {
+            var user = e.Parameter as Model.User;
+            if (user == null) {
+                return;
+            }
+            Model.Unban(user);
         }
 
         #endregion

@@ -12,6 +12,18 @@ namespace Bouncer.Wpf.Model {
     public class User: INotifyPropertyChanged {
         #region Public Properties
 
+        public string BanMenuItemHeader {
+            get {
+                return String.Format("Ban {0}", Name);
+            }
+        }
+
+        public Visibility BanMenuItemVisibility {
+            get {
+                return IsBanned ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
         public Bouncer.User.Bot Bot { get; private set; }
         public double CreatedAt { get; private set; }
 
@@ -106,6 +118,18 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public string UnbanMenuItemHeader {
+            get {
+                return String.Format("Unban {0}", Name);
+            }
+        }
+
+        public Visibility UnbanMenuItemVisibility {
+            get {
+                return IsBanned ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
         #endregion
 
         #region Public Methods
@@ -160,6 +184,8 @@ namespace Bouncer.Wpf.Model {
             if (IsBanned != native.isBanned) {
                 IsBanned = native.isBanned;
                 NotifyPropertyChanged("IsBanned");
+                NotifyPropertyChanged("BanMenuItemVisibility");
+                NotifyPropertyChanged("UnbanMenuItemVisibility");
             }
             if (IsJoined != native.isJoined) {
                 IsJoined = native.isJoined;
@@ -182,6 +208,8 @@ namespace Bouncer.Wpf.Model {
             if (Name != native.name) {
                 Name = native.name;
                 NotifyPropertyChanged("Name");
+                NotifyPropertyChanged("BanMenuItemHeader");
+                NotifyPropertyChanged("UnbanMenuItemHeader");
             }
             if (PartTime != native.partTime) {
                 PartTime = native.partTime;

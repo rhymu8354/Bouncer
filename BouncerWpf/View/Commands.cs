@@ -9,18 +9,22 @@ namespace Bouncer.Wpf.View {
     public static class Commands {
         #region Public Properties
 
+        public static RoutedUICommand Ban { get; private set; }
         public static RoutedUICommand Configure { get; private set; }
         public static RoutedUICommand Exit { get; private set; }
+        public static RoutedUICommand Unban { get; private set; }
 
         #endregion
 
         #region Public Methods
 
         static Commands() {
+            Ban = new RoutedUICommand("Ban", "Ban", typeof(Commands));
             Configure = new RoutedUICommand("_Configure", "Configure", typeof(Commands));
             var exitGestures = new InputGestureCollection();
             exitGestures.Add(new KeyGesture(Key.F4, ModifierKeys.Alt));
             Exit = new RoutedUICommand("E_xit", "Exit", typeof(Commands), exitGestures);
+            Unban = new RoutedUICommand("Unban", "Unban", typeof(Commands));
         }
 
         #endregion

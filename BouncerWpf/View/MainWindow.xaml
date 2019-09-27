@@ -10,6 +10,8 @@
     <Window.CommandBindings>
         <CommandBinding Command="local:Commands.Configure" Executed="OnConfigure" />
         <CommandBinding Command="local:Commands.Exit" Executed="OnExit" />
+        <CommandBinding Command="local:Commands.Ban" Executed="OnBan" />
+        <CommandBinding Command="local:Commands.Unban" Executed="OnUnban" />
     </Window.CommandBindings>
     <Grid>
         <Grid.RowDefinitions>
@@ -55,7 +57,7 @@
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="auto" />
-                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="auto" />
@@ -72,6 +74,29 @@
             ItemsSource="{Binding Users}"
             SelectedItem="{Binding SelectedUser}"
         >
+            <ListView.Resources>
+                <ContextMenu x:Key="ItemContextMenu">
+                    <MenuItem Header="{Binding BanMenuItemHeader}" Command="local:Commands.Ban" CommandParameter="{Binding}">
+                        <MenuItem.Style>
+                            <Style TargetType="{x:Type MenuItem}">
+                                <Setter Property="Visibility" Value="{Binding BanMenuItemVisibility}" />
+                            </Style>
+                        </MenuItem.Style>
+                    </MenuItem>
+                    <MenuItem Header="{Binding UnbanMenuItemHeader}" Command="local:Commands.Unban" CommandParameter="{Binding}">
+                        <MenuItem.Style>
+                            <Style TargetType="{x:Type MenuItem}">
+                                <Setter Property="Visibility" Value="{Binding UnbanMenuItemVisibility}" />
+                            </Style>
+                        </MenuItem.Style>
+                    </MenuItem>
+                </ContextMenu>
+            </ListView.Resources>
+            <ListView.ItemContainerStyle>
+                <Style TargetType="{x:Type ListViewItem}">
+                    <Setter Property="ContextMenu" Value="{StaticResource ItemContextMenu}" />
+                </Style>
+            </ListView.ItemContainerStyle>
             <ListView.View>
                 <GridView>
                     <GridViewColumn DisplayMemberBinding="{Binding Id}">

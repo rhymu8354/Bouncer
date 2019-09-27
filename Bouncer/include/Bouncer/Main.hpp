@@ -13,6 +13,7 @@
 #include <Bouncer/Stats.hpp>
 #include <Bouncer/User.hpp>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace Bouncer {
@@ -37,6 +38,8 @@ namespace Bouncer {
          */
         Main();
 
+        void Ban(intmax_t userid);
+
         Configuration GetConfiguration();
 
         Stats GetStats();
@@ -56,6 +59,8 @@ namespace Bouncer {
         void StartViewTimer();
 
         void StopViewTimer();
+
+        void Unban(intmax_t userid);
 
         // Private properties
     private:
