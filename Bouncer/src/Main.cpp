@@ -434,7 +434,6 @@ namespace Bouncer {
         double viewTimerStart = 0.0;
         std::condition_variable wakeDiagnosticsWorker;
         std::condition_variable_any wakeWorker;
-        std::set< std::string > whitelistSet;
         std::thread worker;
 
 
@@ -481,13 +480,6 @@ namespace Bouncer {
             (void)wasLoggedOut.wait_for(std::chrono::seconds(1));
         }
 
-        void BuildWhitelistSet() {
-            whitelistSet.clear();
-            for (const auto& whitelistEntry: configuration.whitelist) {
-                (void)whitelistSet.insert(whitelistEntry);
-            }
-        }
-
         void DiagnosticsWorker() {
             std::unique_lock< decltype(diagnosticsMutex) > lock(diagnosticsMutex);
             while (!stopDiagnosticsWorker) {
@@ -532,14 +524,6 @@ namespace Bouncer {
             configuration.recentChatThreshold = (double)json["recentChatThreshold"];
             stats.maxViewerCount = (size_t)json["maxViewerCount"];
             stats.totalViewTimeRecorded = (double)json["totalViewTimeRecorded"];
-            const auto& whitelist = json["whitelist"];
-            configuration.whitelist.clear();
-            const auto numWhitelistEntries = whitelist.GetSize();
-            configuration.whitelist.reserve(numWhitelistEntries);
-            for (size_t i = 0; i < numWhitelistEntries; ++i) {
-                configuration.whitelist.push_back((std::string)whitelist[i]);
-            }
-            BuildWhitelistSet();
             const auto& users = json["users"];
             userIdsByLogin.clear();
             userJoinsByLogin.clear();
@@ -572,14 +556,19 @@ namespace Bouncer {
                     const auto role = (std::string)userEncoded["role"];
                     if (role == "staff") {
                         user.role = User::Role::Staff;
+                        user.isWhitelisted = true;
                     } else if (role == "admin") {
                         user.role = User::Role::Admin;
+                        user.isWhitelisted = true;
                     } else if (role == "broadcaster") {
                         user.role = User::Role::Broadcaster;
+                        user.isWhitelisted = true;
                     } else if (role == "moderator") {
                         user.role = User::Role::Moderator;
+                        user.isWhitelisted = true;
                     } else if (role == "vip") {
                         user.role = User::Role::VIP;
+                        user.isWhitelisted = true;
                     } else if (role == "pleb") {
                         user.role = User::Role::Pleb;
                     }
@@ -1139,15 +1128,10 @@ namespace Bouncer {
                 {"channel", configuration.channel},
                 {"newAccountAgeThreshold", configuration.newAccountAgeThreshold},
                 {"recentChatThreshold", configuration.recentChatThreshold},
-                {"whitelist", Json::Array({})},
                 {"users", Json::Array({})},
                 {"maxViewerCount", stats.maxViewerCount},
                 {"totalViewTimeRecorded", totalViewTimeRecorded},
             });
-            auto& whitelist = json["whitelist"];
-            for (const auto& whitelistEntry: configuration.whitelist) {
-                whitelist.Add(whitelistEntry);
-            }
             auto& users = json["users"];
             for (const auto& usersByIdEntry: usersById) {
                 const auto& user = usersByIdEntry.second;
@@ -1267,18 +1251,23 @@ namespace Bouncer {
                 if (badgeParts.size() >= 1) {
                     if (badgeParts[0] == "vip") {
                         user.role = User::Role::VIP;
+                        user.isWhitelisted = true;
                         return;
                     } else if (badgeParts[0] == "moderator") {
                         user.role = User::Role::Moderator;
+                        user.isWhitelisted = true;
                         return;
                     } else if (badgeParts[0] == "broadcaster") {
                         user.role = User::Role::Broadcaster;
+                        user.isWhitelisted = true;
                         return;
                     } else if (badgeParts[0] == "admin") {
                         user.role = User::Role::Admin;
+                        user.isWhitelisted = true;
                         return;
                     } else if (badgeParts[0] == "staff") {
                         user.role = User::Role::Staff;
+                        user.isWhitelisted = true;
                         return;
                     }
                 }
@@ -1580,15 +1569,18 @@ namespace Bouncer {
             if (now - userSnapshot.createdAt < impl_->configuration.newAccountAgeThreshold) {
                 userSnapshot.isNewAccount = true;
             }
-            if (
-                (userSnapshot.role == User::Role::Pleb)
-                && (impl_->whitelistSet.find(userSnapshot.login) != impl_->whitelistSet.end())
-            ) {
-                userSnapshot.role = User::Role::Regular;
-            }
             users.push_back(std::move(userSnapshot));
         }
         return users;
+    }
+
+    void Main::SetBotStatus(intmax_t userid, User::Bot bot) {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        auto usersByIdEntry = impl_->usersById.find(userid);
+        if (usersByIdEntry == impl_->usersById.end()) {
+            return;
+        }
+        usersByIdEntry->second.bot = bot;
     }
 
     void Main::SetConfiguration(const Configuration& configuration) {
@@ -1596,7 +1588,6 @@ namespace Bouncer {
         impl_->configuration = configuration;
         impl_->configurationChanged = true;
         impl_->SaveConfiguration();
-        impl_->BuildWhitelistSet();
         impl_->wakeWorker.notify_one();
     }
 
@@ -1690,6 +1681,24 @@ namespace Bouncer {
                 usersByIdEntry->second.login.c_str()
             )
         );
+    }
+
+    void Main::Unwhitelist(intmax_t userid) {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        auto usersByIdEntry = impl_->usersById.find(userid);
+        if (usersByIdEntry == impl_->usersById.end()) {
+            return;
+        }
+        usersByIdEntry->second.isWhitelisted = false;
+    }
+
+    void Main::Whitelist(intmax_t userid) {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        auto usersByIdEntry = impl_->usersById.find(userid);
+        if (usersByIdEntry == impl_->usersById.end()) {
+            return;
+        }
+        usersByIdEntry->second.isWhitelisted = true;
     }
 
 }

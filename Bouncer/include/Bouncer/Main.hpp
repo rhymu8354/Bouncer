@@ -46,6 +46,8 @@ namespace Bouncer {
 
         std::vector< User > GetUsers();
 
+        void SetBotStatus(intmax_t userid, User::Bot bot);
+
         void SetConfiguration(const Configuration& configuration);
 
         /**
@@ -61,6 +63,10 @@ namespace Bouncer {
         void StopViewTimer();
 
         void Unban(intmax_t userid);
+
+        void Unwhitelist(intmax_t userid);
+
+        void Whitelist(intmax_t userid);
 
         // Private properties
     private:

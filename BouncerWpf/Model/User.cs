@@ -62,6 +62,7 @@ namespace Bouncer.Wpf.Model {
         public long Id { get; private set; }
         public bool IsBanned { get; private set; }
         public bool IsJoined { get; private set; }
+        public bool IsWhitelisted { get; private set; }
         public double JoinTime { get; private set; }
 
         public string JoinTimeFormatted {
@@ -93,6 +94,42 @@ namespace Bouncer.Wpf.Model {
         public string TotalViewTimeFormatted {
             get {
                 return Utilities.FormatDeltaTime(TotalViewTime);
+            }
+        }
+
+        public string MarkBotMenuItemHeader {
+            get {
+                return "Bot";
+            }
+        }
+
+        public Visibility MarkBotMenuItemVisibility {
+            get {
+                return (Bot == Bouncer.User.Bot.Yes) ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
+        public string MarkNotBotMenuItemHeader {
+            get {
+                return "Not a bot";
+            }
+        }
+
+        public Visibility MarkNotBotMenuItemVisibility {
+            get {
+                return (Bot == Bouncer.User.Bot.No) ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
+        public string MarkPossibleBotMenuItemHeader {
+            get {
+                return "Possibly a bot";
+            }
+        }
+
+        public Visibility MarkPossibleBotMenuItemVisibility {
+            get {
+                return (Bot == Bouncer.User.Bot.Unknown) ? Visibility.Collapsed : Visibility.Visible;
             }
         }
 
@@ -130,6 +167,31 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public string UnwhitelistMenuItemHeader {
+            get {
+                return String.Format("Unwhitelist {0}", Name);
+            }
+        }
+
+        public Visibility UnwhitelistMenuItemVisibility {
+            get {
+                return IsWhitelisted ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        public string WhitelistMenuItemHeader {
+            get {
+                return String.Format("Whitelist {0}", Name);
+            }
+        }
+
+        public Visibility WhitelistMenuItemVisibility {
+            get {
+                return IsWhitelisted ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
+
         #endregion
 
         #region Public Methods
@@ -142,6 +204,7 @@ namespace Bouncer.Wpf.Model {
             Id = native.id;
             IsBanned = native.isBanned;
             IsJoined = native.isJoined;
+            IsWhitelisted = native.isWhitelisted;
             JoinTime = native.joinTime;
             LastMessageTime = native.lastMessageTime;
             Login = native.login;
@@ -158,6 +221,9 @@ namespace Bouncer.Wpf.Model {
             if (Bot != native.bot) {
                 Bot = native.bot;
                 NotifyPropertyChanged("Bot");
+                NotifyPropertyChanged("MarkBotMenuItemVisibility");
+                NotifyPropertyChanged("MarkNotBotMenuItemVisibility");
+                NotifyPropertyChanged("MarkPossibleBotMenuItemVisibility");
             }
             if (CreatedAt != native.createdAt) {
                 CreatedAt = native.createdAt;
@@ -186,6 +252,12 @@ namespace Bouncer.Wpf.Model {
                 NotifyPropertyChanged("IsBanned");
                 NotifyPropertyChanged("BanMenuItemVisibility");
                 NotifyPropertyChanged("UnbanMenuItemVisibility");
+            }
+            if (IsWhitelisted != native.isWhitelisted) {
+                IsWhitelisted = native.isWhitelisted;
+                NotifyPropertyChanged("IsWhitelisted");
+                NotifyPropertyChanged("WhitelistMenuItemVisibility");
+                NotifyPropertyChanged("UnwhitelistMenuItemVisibility");
             }
             if (IsJoined != native.isJoined) {
                 IsJoined = native.isJoined;

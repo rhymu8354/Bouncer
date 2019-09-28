@@ -11,7 +11,12 @@
         <CommandBinding Command="local:Commands.Configure" Executed="OnConfigure" />
         <CommandBinding Command="local:Commands.Exit" Executed="OnExit" />
         <CommandBinding Command="local:Commands.Ban" Executed="OnBan" />
+        <CommandBinding Command="local:Commands.MarkBot" Executed="OnMarkBot" />
+        <CommandBinding Command="local:Commands.MarkNotBot" Executed="OnMarkNotBot" />
+        <CommandBinding Command="local:Commands.MarkPossibleBot" Executed="OnMarkPossibleBot" />
         <CommandBinding Command="local:Commands.Unban" Executed="OnUnban" />
+        <CommandBinding Command="local:Commands.Unwhitelist" Executed="OnUnwhitelist" />
+        <CommandBinding Command="local:Commands.Whitelist" Executed="OnWhitelist" />
     </Window.CommandBindings>
     <Grid>
         <Grid.RowDefinitions>
@@ -43,7 +48,6 @@
                 <Separator />
                 <MenuItem Header="Show _Moderators" IsCheckable="True" IsChecked="{Binding ShowModViewers}" />
                 <MenuItem Header="Show _VIPs" IsCheckable="True" IsChecked="{Binding ShowVipViewers}" />
-                <MenuItem Header="Show _Regulars" IsCheckable="True" IsChecked="{Binding ShowRegularViewers}" />
                 <MenuItem Header="Show _Plebs" IsCheckable="True" IsChecked="{Binding ShowPlebViewers}" />
                 <MenuItem Header="Show _Unknown Viewers" IsCheckable="True" IsChecked="{Binding ShowUnknownViewers}" />
                 <Separator />
@@ -52,6 +56,9 @@
                 <MenuItem Header="Show _Lurkers" IsCheckable="True" IsChecked="{Binding ShowLurkingViewers}" />
                 <MenuItem Header="Show _Chatters" IsCheckable="True" IsChecked="{Binding ShowChattingViewers}" />
                 <MenuItem Header="Show _Recent Chatters" IsCheckable="True" IsChecked="{Binding ShowRecentlyChattingViewers}" />
+                <Separator />
+                <MenuItem Header="Show _Whitelisted Viewers" IsCheckable="True" IsChecked="{Binding ShowWhitelistedViewers}" />
+                <MenuItem Header="Show Non-Whitelisted Viewers" IsCheckable="True" IsChecked="{Binding ShowNonWhitelistedViewers}" />
             </MenuItem>
         </Menu>
         <Grid Grid.Row="1">
@@ -75,7 +82,10 @@
             SelectedItem="{Binding SelectedUser}"
         >
             <ListView.Resources>
-                <ContextMenu x:Key="ItemContextMenu">
+                <ContextMenu
+                    x:Key="ItemContextMenu"
+                    DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                >
                     <MenuItem Header="{Binding BanMenuItemHeader}" Command="local:Commands.Ban" CommandParameter="{Binding}">
                         <MenuItem.Style>
                             <Style TargetType="{x:Type MenuItem}">
@@ -87,6 +97,43 @@
                         <MenuItem.Style>
                             <Style TargetType="{x:Type MenuItem}">
                                 <Setter Property="Visibility" Value="{Binding UnbanMenuItemVisibility}" />
+                            </Style>
+                        </MenuItem.Style>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem Header="{Binding WhitelistMenuItemHeader}" Command="local:Commands.Whitelist" CommandParameter="{Binding}">
+                        <MenuItem.Style>
+                            <Style TargetType="{x:Type MenuItem}">
+                                <Setter Property="Visibility" Value="{Binding WhitelistMenuItemVisibility}" />
+                            </Style>
+                        </MenuItem.Style>
+                    </MenuItem>
+                    <MenuItem Header="{Binding UnwhitelistMenuItemHeader}" Command="local:Commands.Unwhitelist" CommandParameter="{Binding}">
+                        <MenuItem.Style>
+                            <Style TargetType="{x:Type MenuItem}">
+                                <Setter Property="Visibility" Value="{Binding UnwhitelistMenuItemVisibility}" />
+                            </Style>
+                        </MenuItem.Style>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem Header="{Binding MarkBotMenuItemHeader}" Command="local:Commands.MarkBot" CommandParameter="{Binding}">
+                        <MenuItem.Style>
+                            <Style TargetType="{x:Type MenuItem}">
+                                <Setter Property="Visibility" Value="{Binding MarkBotMenuItemVisibility}" />
+                            </Style>
+                        </MenuItem.Style>
+                    </MenuItem>
+                    <MenuItem Header="{Binding MarkNotBotMenuItemHeader}" Command="local:Commands.MarkNotBot" CommandParameter="{Binding}">
+                        <MenuItem.Style>
+                            <Style TargetType="{x:Type MenuItem}">
+                                <Setter Property="Visibility" Value="{Binding MarkNotBotMenuItemVisibility}" />
+                            </Style>
+                        </MenuItem.Style>
+                    </MenuItem>
+                    <MenuItem Header="{Binding MarkPossibleBotMenuItemHeader}" Command="local:Commands.MarkPossibleBot" CommandParameter="{Binding}">
+                        <MenuItem.Style>
+                            <Style TargetType="{x:Type MenuItem}">
+                                <Setter Property="Visibility" Value="{Binding MarkPossibleBotMenuItemVisibility}" />
                             </Style>
                         </MenuItem.Style>
                     </MenuItem>
@@ -162,6 +209,11 @@
                     <GridViewColumn DisplayMemberBinding="{Binding IsBanned}">
                         <GridViewColumn.Header>
                             <GridViewColumnHeader Click="OnSortUsers" Tag="IsBanned">Banned</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding IsWhitelisted}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="IsWhitelisted">Whitelisted</GridViewColumnHeader>
                         </GridViewColumn.Header>
                     </GridViewColumn>
                     <GridViewColumn DisplayMemberBinding="{Binding IsJoined}">

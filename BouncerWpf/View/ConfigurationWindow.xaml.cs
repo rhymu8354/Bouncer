@@ -74,19 +74,6 @@ namespace Bouncer.Wpf.View {
             Configuration = Model.Configuration;
         }
 
-        private void OnNewWhitelistEntry(object sender, ExecutedRoutedEventArgs e) {
-            var entry = NewWhitelistEntry.Text;
-            NewWhitelistEntry.Text = "";
-            if (Configuration.Whitelist.IndexOf(entry) < 0) {
-                Configuration.Whitelist.Add(entry);
-            }
-        }
-
-        private void OnRemoveWhitelistEntry(object sender, ExecutedRoutedEventArgs e) {
-            var entry = (string)e.Parameter;
-            Configuration.Whitelist.Remove(entry);
-        }
-
         private void OnSave(object sender, RoutedEventArgs e) {
             Model.Configuration = Configuration;
             Close();

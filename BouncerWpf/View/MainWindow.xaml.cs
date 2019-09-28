@@ -92,12 +92,52 @@ namespace Bouncer.Wpf.View {
             UsersList.Items.SortDescriptions.Add(new SortDescription(tag, sortDirection));
         }
 
+        private void OnMarkBot(object sender, ExecutedRoutedEventArgs e) {
+            var user = e.Parameter as Model.User;
+            if (user == null) {
+                return;
+            }
+            Model.SetBotStatus(user, User.Bot.Yes);
+        }
+
+        private void OnMarkNotBot(object sender, ExecutedRoutedEventArgs e) {
+            var user = e.Parameter as Model.User;
+            if (user == null) {
+                return;
+            }
+            Model.SetBotStatus(user, User.Bot.No);
+        }
+
+        private void OnMarkPossibleBot(object sender, ExecutedRoutedEventArgs e) {
+            var user = e.Parameter as Model.User;
+            if (user == null) {
+                return;
+            }
+            Model.SetBotStatus(user, User.Bot.Unknown);
+        }
+
         private void OnUnban(object sender, ExecutedRoutedEventArgs e) {
             var user = e.Parameter as Model.User;
             if (user == null) {
                 return;
             }
             Model.Unban(user);
+        }
+
+        private void OnUnwhitelist(object sender, ExecutedRoutedEventArgs e) {
+            var user = e.Parameter as Model.User;
+            if (user == null) {
+                return;
+            }
+            Model.Unwhitelist(user);
+        }
+
+        private void OnWhitelist(object sender, ExecutedRoutedEventArgs e) {
+            var user = e.Parameter as Model.User;
+            if (user == null) {
+                return;
+            }
+            Model.Whitelist(user);
         }
 
         #endregion

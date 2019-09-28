@@ -68,6 +68,16 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public uint MinDiagnosticsThreshold {
+            get {
+                return Adaptee.minDiagnosticsLevel;
+            }
+            set {
+                Adaptee.minDiagnosticsLevel = value;
+                NotifyPropertyChanged("MinDiagnosticsThreshold");
+            }
+        }
+
         public double NewAccountAgeThreshold {
             get {
                 return Adaptee.newAccountAgeThreshold;
@@ -88,15 +98,12 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
-        public ObservableStdVector<StdVectorString, string> Whitelist { get; private set; }
-
         #endregion
 
         #region Public Methods
 
         public Configuration(Bouncer.Configuration adaptee) {
             Adaptee = adaptee;
-            Whitelist = new ObservableStdVector<StdVectorString, string>(Adaptee.whitelist);
         }
 
         #endregion

@@ -162,7 +162,6 @@ namespace Bouncer.Wpf.Model {
                 ShowNonTimedOutViewers = value;
                 ShowModViewers = value;
                 ShowVipViewers = value;
-                ShowRegularViewers = value;
                 ShowPlebViewers = value;
                 ShowUnknownViewers = value;
                 ShowCurrentViewers = value;
@@ -322,25 +321,6 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowVipViewers");
-                RefreshUsers();
-            }
-        }
-
-        private bool showRegularViewers_ = true;
-        public bool ShowRegularViewers {
-            get {
-                return showRegularViewers_;
-            }
-            set {
-                if (ShowRegularViewers == value) {
-                    return;
-                }
-                showRegularViewers_ = value;
-                if (!value) {
-                    showAllViewers_ = false;
-                    NotifyPropertyChanged("ShowAllViewers");
-                }
-                NotifyPropertyChanged("ShowRegularViewers");
                 RefreshUsers();
             }
         }
@@ -551,8 +531,20 @@ namespace Bouncer.Wpf.Model {
             Native.Ban(user.Id);
         }
 
+        public void SetBotStatus(User user, Bouncer.User.Bot bot) {
+            Native.SetBotStatus(user.Id, bot);
+        }
+
         public void Unban(User user) {
             Native.Unban(user.Id);
+        }
+
+        public void Unwhitelist(User user) {
+            Native.Unwhitelist(user.Id);
+        }
+
+        public void Whitelist(User user) {
+            Native.Whitelist(user.Id);
         }
 
         #endregion
@@ -630,10 +622,6 @@ namespace Bouncer.Wpf.Model {
                     if (ShowVipViewers) show = true;
                     break;
 
-                case Bouncer.User.Role.Regular:
-                    if (ShowRegularViewers) show = true;
-                    break;
-
                 case Bouncer.User.Role.Pleb:
                     if (ShowPlebViewers) show = true;
                     break;
@@ -662,7 +650,7 @@ namespace Bouncer.Wpf.Model {
             }
             if (!show) return false;
             show = false;
-            if (Configuration.Whitelist.IndexOf(user.login) >= 0) {
+            if (user.isWhitelisted) {
                 if (ShowWhitelistedViewers) show = true;
             } else {
                 if (ShowNonWhitelistedViewers) show = true;

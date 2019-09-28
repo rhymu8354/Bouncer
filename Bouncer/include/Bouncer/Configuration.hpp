@@ -9,7 +9,6 @@
  */
 
 #include <string>
-#include <vector>
 
 namespace Bouncer {
 
@@ -24,7 +23,7 @@ namespace Bouncer {
         std::string channel;
         double newAccountAgeThreshold = 604800.0;
         double recentChatThreshold = 1800.0;
-        std::vector< std::string > whitelist;
+        size_t minDiagnosticsLevel = 0;
     };
 
 }

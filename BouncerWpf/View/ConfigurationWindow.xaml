@@ -36,51 +36,8 @@
         <TextBox Text="{Binding NewAccountAgeThreshold}" Grid.Row="4" Grid.Column="1" Width="500" VerticalAlignment="Center" />
         <Label Grid.Row="5" Grid.Column="0" HorizontalAlignment="Right" Content="Recent chat time threshold:" />
         <TextBox Text="{Binding RecentChatThreshold}" Grid.Row="5" Grid.Column="1" Width="500" VerticalAlignment="Center" />
-        <GroupBox Grid.Row="6" Grid.ColumnSpan="2" Header="Whitelist">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="auto" />
-                    <RowDefinition Height="auto" />
-                </Grid.RowDefinitions>
-                <ListBox
-                    Grid.Row="0"
-                    ItemsSource="{Binding Whitelist}"
-                    Height="300"
-                    HorizontalContentAlignment="Stretch"
-                >
-                    <ListBox.CommandBindings>
-                        <CommandBinding Command="ApplicationCommands.Delete" Executed="OnRemoveWhitelistEntry" />
-                    </ListBox.CommandBindings>
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="{Binding}" />
-                                <Button Grid.Column="1" Width="25" Content="-" Command="ApplicationCommands.Delete" CommandParameter="{Binding}" HorizontalAlignment="Right" />
-                            </Grid>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-                <Grid Grid.Row="1">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="auto" />
-                    </Grid.ColumnDefinitions>
-                    <Grid.CommandBindings>
-                        <CommandBinding Command="ApplicationCommands.New" Executed="OnNewWhitelistEntry" />
-                    </Grid.CommandBindings>
-                    <TextBox x:Name="NewWhitelistEntry">
-                        <TextBox.InputBindings>
-                            <KeyBinding Key="Enter" Command="ApplicationCommands.New" />
-                        </TextBox.InputBindings>
-                    </TextBox>
-                    <Button Grid.Column="1" Width="25" Content="+" Command="ApplicationCommands.New" />
-                </Grid>
-            </Grid>
-        </GroupBox>
+        <Label Grid.Row="6" Grid.Column="0" HorizontalAlignment="Right" Content="Minimum diagnostics threshold:" />
+        <TextBox Text="{Binding MinDiagnosticsThreshold}" Grid.Row="6" Grid.Column="1" Width="500" VerticalAlignment="Center" />
         <Grid Grid.Row="7" Grid.ColumnSpan="2" Margin="20,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="auto" />
