@@ -7,10 +7,25 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
 
 namespace Bouncer.Wpf.Model {
     public class User: INotifyPropertyChanged {
         #region Public Properties
+
+        public Brush Foreground {
+            get {
+                if (IsBanned) {
+                    return Brushes.Red;
+                } else if (Watching) {
+                    return Brushes.Blue;
+                } else if (IsNewAccount) {
+                    return Brushes.Green;
+                } else {
+                    return Brushes.Black;
+                }
+            }
+        }
 
         public string BanMenuItemHeader {
             get {
@@ -68,6 +83,8 @@ namespace Bouncer.Wpf.Model {
         public long Id { get; private set; }
         public bool IsBanned { get; private set; }
         public bool IsJoined { get; private set; }
+        public bool IsNewAccount { get; private set; }
+        public bool IsRecentChatter { get; private set; }
         public bool IsWhitelisted { get; private set; }
         public double JoinTime { get; private set; }
 
@@ -238,6 +255,8 @@ namespace Bouncer.Wpf.Model {
             Id = native.id;
             IsBanned = native.isBanned;
             IsJoined = native.isJoined;
+            IsNewAccount = native.isNewAccount;
+            IsRecentChatter = native.isRecentChatter;
             Watching = native.watching;
             IsWhitelisted = native.isWhitelisted;
             JoinTime = native.joinTime;
@@ -286,8 +305,19 @@ namespace Bouncer.Wpf.Model {
             if (IsBanned != native.isBanned) {
                 IsBanned = native.isBanned;
                 NotifyPropertyChanged("IsBanned");
+                NotifyPropertyChanged("Foreground");
                 NotifyPropertyChanged("BanMenuItemVisibility");
                 NotifyPropertyChanged("UnbanMenuItemVisibility");
+            }
+            if (IsNewAccount != native.isNewAccount) {
+                IsNewAccount = native.isNewAccount;
+                NotifyPropertyChanged("IsNewAccount");
+                NotifyPropertyChanged("Foreground");
+            }
+            if (IsRecentChatter != native.isRecentChatter) {
+                IsRecentChatter = native.isRecentChatter;
+                NotifyPropertyChanged("IsRecentChatter");
+                NotifyPropertyChanged("Foreground");
             }
             if (IsWhitelisted != native.isWhitelisted) {
                 IsWhitelisted = native.isWhitelisted;
@@ -302,6 +332,7 @@ namespace Bouncer.Wpf.Model {
             if (Watching != native.watching) {
                 Watching = native.watching;
                 NotifyPropertyChanged("Watching");
+                NotifyPropertyChanged("Foreground");
                 NotifyPropertyChanged("StartWatchingMenuItemVisibility");
                 NotifyPropertyChanged("StopWatchingMenuItemVisibility");
             }

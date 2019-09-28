@@ -170,6 +170,8 @@ namespace Bouncer.Wpf.Model {
                 ShowNonWhitelistedViewers = value;
                 ShowWatchedViewers = value;
                 ShowUnwatchedViewers = value;
+                ShowNewAccounts = value;
+                ShowOldAccounts = value;
                 NotifyPropertyChanged("ShowAllViewers");
                 RefreshUsers();
             }
@@ -315,6 +317,25 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        private bool showNewAccounts_ = true;
+        public bool ShowNewAccounts {
+            get {
+                return showNewAccounts_;
+            }
+            set {
+                if (ShowNewAccounts == value) {
+                    return;
+                }
+                showNewAccounts_ = value;
+                if (!value) {
+                    showAllViewers_ = false;
+                    NotifyPropertyChanged("ShowAllViewers");
+                }
+                NotifyPropertyChanged("ShowNewAccounts");
+                RefreshUsers();
+            }
+        }
+
         private bool showNonBotViewers_ = true;
         public bool ShowNonBotViewers {
             get {
@@ -368,6 +389,25 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowNonWhitelistedViewers");
+                RefreshUsers();
+            }
+        }
+
+        private bool showOldAccounts_ = true;
+        public bool ShowOldAccounts {
+            get {
+                return showOldAccounts_;
+            }
+            set {
+                if (ShowOldAccounts == value) {
+                    return;
+                }
+                showOldAccounts_ = value;
+                if (!value) {
+                    showAllViewers_ = false;
+                    NotifyPropertyChanged("ShowAllViewers");
+                }
+                NotifyPropertyChanged("ShowOldAccounts");
                 RefreshUsers();
             }
         }
@@ -707,10 +747,19 @@ namespace Bouncer.Wpf.Model {
             } else {
                 if (ShowNonWhitelistedViewers) show = true;
             }
+            if (!show) return false;
+            show = false;
             if (user.watching) {
                 if (ShowWatchedViewers) show = true;
             } else {
                 if (ShowUnwatchedViewers) show = true;
+            }
+            if (!show) return false;
+            show = false;
+            if (user.isNewAccount) {
+                if (ShowNewAccounts) show = true;
+            } else {
+                if (ShowOldAccounts) show = true;
             }
             return show;
         }
