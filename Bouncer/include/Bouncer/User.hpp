@@ -37,6 +37,8 @@ namespace Bouncer {
         bool isRecentChatter = false;
         bool isNewAccount = false;
         bool isWhitelisted = false;
+        bool watching = false;
+        std::string note;
         enum class Bot {
             Unknown,
             Yes,

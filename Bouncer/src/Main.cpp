@@ -544,6 +544,9 @@ namespace Bouncer {
                 user.numMessages = (size_t)userEncoded["numMessages"];
                 user.timeout = (double)userEncoded["timeout"];
                 user.isBanned = (bool)userEncoded["isBanned"];
+                user.isWhitelisted = (bool)userEncoded["isWhitelisted"];
+                user.watching = (bool)userEncoded["watching"];
+                user.note = (std::string)userEncoded["note"];
                 if (userEncoded.Has("bot")) {
                     const auto bot = (std::string)userEncoded["bot"];
                     if (bot == "yes") {
@@ -1154,6 +1157,9 @@ namespace Bouncer {
                     {"numMessages", user.numMessages},
                     {"timeout", user.timeout},
                     {"isBanned", user.isBanned},
+                    {"isWhitelisted", user.isWhitelisted},
+                    {"watching", user.watching},
+                    {"note", user.note},
                 });
                 switch (user.bot) {
                     case User::Bot::Yes: {
@@ -1591,6 +1597,15 @@ namespace Bouncer {
         impl_->wakeWorker.notify_one();
     }
 
+    void Main::SetNote(intmax_t userid, const std::string& note) {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        auto usersByIdEntry = impl_->usersById.find(userid);
+        if (usersByIdEntry == impl_->usersById.end()) {
+            return;
+        }
+        usersByIdEntry->second.note = note;
+    }
+
     void Main::StartApplication(std::shared_ptr< Host > host) {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
         if (impl_->worker.joinable()) {
@@ -1633,6 +1648,15 @@ namespace Bouncer {
         }
     }
 
+    void Main::StartWatching(intmax_t userid) {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        auto usersByIdEntry = impl_->usersById.find(userid);
+        if (usersByIdEntry == impl_->usersById.end()) {
+            return;
+        }
+        usersByIdEntry->second.watching = true;
+    }
+
     void Main::StopViewTimer() {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
         if (!impl_->viewTimerRunning) {
@@ -1650,6 +1674,15 @@ namespace Bouncer {
                 user.totalViewTime += (now - user.joinTime);
             }
         }
+    }
+
+    void Main::StopWatching(intmax_t userid) {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        auto usersByIdEntry = impl_->usersById.find(userid);
+        if (usersByIdEntry == impl_->usersById.end()) {
+            return;
+        }
+        usersByIdEntry->second.watching = false;
     }
 
     void Main::Unban(intmax_t userid) {

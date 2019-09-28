@@ -5,15 +5,18 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Bouncer.Wpf.View"
         mc:Ignorable="d"
-        Title="Bouncer" Height="600" Width="1250"
+        Title="Bouncer" Height="800" Width="1600"
         Closed="OnClosed">
     <Window.CommandBindings>
         <CommandBinding Command="local:Commands.Configure" Executed="OnConfigure" />
         <CommandBinding Command="local:Commands.Exit" Executed="OnExit" />
         <CommandBinding Command="local:Commands.Ban" Executed="OnBan" />
+        <CommandBinding Command="local:Commands.EditNote" Executed="OnEditNote" />
         <CommandBinding Command="local:Commands.MarkBot" Executed="OnMarkBot" />
         <CommandBinding Command="local:Commands.MarkNotBot" Executed="OnMarkNotBot" />
         <CommandBinding Command="local:Commands.MarkPossibleBot" Executed="OnMarkPossibleBot" />
+        <CommandBinding Command="local:Commands.StartWatching" Executed="OnStartWatching" />
+        <CommandBinding Command="local:Commands.StopWatching" Executed="OnStopWatching" />
         <CommandBinding Command="local:Commands.Unban" Executed="OnUnban" />
         <CommandBinding Command="local:Commands.Unwhitelist" Executed="OnUnwhitelist" />
         <CommandBinding Command="local:Commands.Whitelist" Executed="OnWhitelist" />
@@ -59,6 +62,9 @@
                 <Separator />
                 <MenuItem Header="Show _Whitelisted Viewers" IsCheckable="True" IsChecked="{Binding ShowWhitelistedViewers}" />
                 <MenuItem Header="Show Non-Whitelisted Viewers" IsCheckable="True" IsChecked="{Binding ShowNonWhitelistedViewers}" />
+                <Separator />
+                <MenuItem Header="Show Watched Viewers" IsCheckable="True" IsChecked="{Binding ShowWatchedViewers}" />
+                <MenuItem Header="Show Unwatched Viewers" IsCheckable="True" IsChecked="{Binding ShowUnwatchedViewers}" />
             </MenuItem>
         </Menu>
         <Grid Grid.Row="1">
@@ -116,6 +122,21 @@
                         </MenuItem.Style>
                     </MenuItem>
                     <Separator />
+                    <MenuItem Header="{Binding StartWatchingMenuItemHeader}" Command="local:Commands.StartWatching" CommandParameter="{Binding}">
+                        <MenuItem.Style>
+                            <Style TargetType="{x:Type MenuItem}">
+                                <Setter Property="Visibility" Value="{Binding StartWatchingMenuItemVisibility}" />
+                            </Style>
+                        </MenuItem.Style>
+                    </MenuItem>
+                    <MenuItem Header="{Binding StopWatchingMenuItemHeader}" Command="local:Commands.StopWatching" CommandParameter="{Binding}">
+                        <MenuItem.Style>
+                            <Style TargetType="{x:Type MenuItem}">
+                                <Setter Property="Visibility" Value="{Binding StopWatchingMenuItemVisibility}" />
+                            </Style>
+                        </MenuItem.Style>
+                    </MenuItem>
+                    <Separator />
                     <MenuItem Header="{Binding MarkBotMenuItemHeader}" Command="local:Commands.MarkBot" CommandParameter="{Binding}">
                         <MenuItem.Style>
                             <Style TargetType="{x:Type MenuItem}">
@@ -137,6 +158,8 @@
                             </Style>
                         </MenuItem.Style>
                     </MenuItem>
+                    <Separator />
+                    <MenuItem Header="{Binding EditNoteMenuItemHeader}" Command="local:Commands.EditNote" CommandParameter="{Binding}" />
                 </ContextMenu>
             </ListView.Resources>
             <ListView.ItemContainerStyle>
@@ -216,6 +239,11 @@
                             <GridViewColumnHeader Click="OnSortUsers" Tag="IsWhitelisted">Whitelisted</GridViewColumnHeader>
                         </GridViewColumn.Header>
                     </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding Watching}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="Watching">Watching</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
                     <GridViewColumn DisplayMemberBinding="{Binding IsJoined}">
                         <GridViewColumn.Header>
                             <GridViewColumnHeader Click="OnSortUsers" Tag="IsJoined">Joined</GridViewColumnHeader>
@@ -224,6 +252,11 @@
                     <GridViewColumn DisplayMemberBinding="{Binding Bot}">
                         <GridViewColumn.Header>
                             <GridViewColumnHeader Click="OnSortUsers" Tag="Bot">Bot</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding Note}" >
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="Note">Note</GridViewColumnHeader>
                         </GridViewColumn.Header>
                     </GridViewColumn>
                 </GridView>

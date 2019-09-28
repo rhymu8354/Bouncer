@@ -168,64 +168,9 @@ namespace Bouncer.Wpf.Model {
                 ShowMissingViewers = value;
                 ShowWhitelistedViewers = value;
                 ShowNonWhitelistedViewers = value;
+                ShowWatchedViewers = value;
+                ShowUnwatchedViewers = value;
                 NotifyPropertyChanged("ShowAllViewers");
-                RefreshUsers();
-            }
-        }
-
-        private bool showKnownBotViewers_ = true;
-        public bool ShowKnownBotViewers {
-            get {
-                return showKnownBotViewers_;
-            }
-            set {
-                if (ShowKnownBotViewers == value) {
-                    return;
-                }
-                showKnownBotViewers_ = value;
-                if (!value) {
-                    showAllViewers_ = false;
-                    NotifyPropertyChanged("ShowAllViewers");
-                }
-                NotifyPropertyChanged("ShowKnownBotViewers");
-                RefreshUsers();
-            }
-        }
-
-        private bool showPossibleBotViewers_ = true;
-        public bool ShowPossibleBotViewers {
-            get {
-                return showPossibleBotViewers_;
-            }
-            set {
-                if (ShowPossibleBotViewers == value) {
-                    return;
-                }
-                showPossibleBotViewers_ = value;
-                if (!value) {
-                    showAllViewers_ = false;
-                    NotifyPropertyChanged("ShowAllViewers");
-                }
-                NotifyPropertyChanged("ShowPossibleBotViewers");
-                RefreshUsers();
-            }
-        }
-
-        private bool showNonBotViewers_ = true;
-        public bool ShowNonBotViewers {
-            get {
-                return showNonBotViewers_;
-            }
-            set {
-                if (ShowNonBotViewers == value) {
-                    return;
-                }
-                showNonBotViewers_ = value;
-                if (!value) {
-                    showAllViewers_ = false;
-                    NotifyPropertyChanged("ShowAllViewers");
-                }
-                NotifyPropertyChanged("ShowNonBotViewers");
                 RefreshUsers();
             }
         }
@@ -249,116 +194,24 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
-        private bool showTimedOutViewers_ = true;
-        public bool ShowTimedOutViewers {
+        private bool showChattingViewers_ = true;
+        public bool ShowChattingViewers {
             get {
-                return showTimedOutViewers_;
+                return showChattingViewers_;
             }
             set {
-                if (ShowTimedOutViewers == value) {
+                if (ShowChattingViewers == value) {
                     return;
                 }
-                showTimedOutViewers_ = value;
+                showChattingViewers_ = value;
+                ShowRecentlyChattingViewers = value;
                 if (!value) {
                     showAllViewers_ = false;
+                    showCurrentViewers_ = false;
                     NotifyPropertyChanged("ShowAllViewers");
+                    NotifyPropertyChanged("ShowCurrentViewers");
                 }
-                NotifyPropertyChanged("ShowTimedOutViewers");
-                RefreshUsers();
-            }
-        }
-
-        private bool showNonTimedOutViewers_ = true;
-        public bool ShowNonTimedOutViewers {
-            get {
-                return showNonTimedOutViewers_;
-            }
-            set {
-                if (ShowNonTimedOutViewers == value) {
-                    return;
-                }
-                showNonTimedOutViewers_ = value;
-                if (!value) {
-                    showAllViewers_ = false;
-                    NotifyPropertyChanged("ShowAllViewers");
-                }
-                NotifyPropertyChanged("ShowNonTimedOutViewers");
-                RefreshUsers();
-            }
-        }
-
-        private bool showModViewers_ = true;
-        public bool ShowModViewers {
-            get {
-                return showModViewers_;
-            }
-            set {
-                if (ShowModViewers == value) {
-                    return;
-                }
-                showModViewers_ = value;
-                if (!value) {
-                    showAllViewers_ = false;
-                    NotifyPropertyChanged("ShowAllViewers");
-                }
-                NotifyPropertyChanged("ShowModViewers");
-                RefreshUsers();
-            }
-        }
-
-        private bool showVipViewers_ = true;
-        public bool ShowVipViewers {
-            get {
-                return showVipViewers_;
-            }
-            set {
-                if (ShowVipViewers == value) {
-                    return;
-                }
-                showVipViewers_ = value;
-                if (!value) {
-                    showAllViewers_ = false;
-                    NotifyPropertyChanged("ShowAllViewers");
-                }
-                NotifyPropertyChanged("ShowVipViewers");
-                RefreshUsers();
-            }
-        }
-
-        private bool showPlebViewers_ = true;
-        public bool ShowPlebViewers {
-            get {
-                return showPlebViewers_;
-            }
-            set {
-                if (ShowPlebViewers == value) {
-                    return;
-                }
-                showPlebViewers_ = value;
-                if (!value) {
-                    showAllViewers_ = false;
-                    NotifyPropertyChanged("ShowAllViewers");
-                }
-                NotifyPropertyChanged("ShowPlebViewers");
-                RefreshUsers();
-            }
-        }
-
-        private bool showUnknownViewers_ = true;
-        public bool ShowUnknownViewers {
-            get {
-                return showUnknownViewers_;
-            }
-            set {
-                if (ShowUnknownViewers == value) {
-                    return;
-                }
-                showUnknownViewers_ = value;
-                if (!value) {
-                    showAllViewers_ = false;
-                    NotifyPropertyChanged("ShowAllViewers");
-                }
-                NotifyPropertyChanged("ShowUnknownViewers");
+                NotifyPropertyChanged("ShowChattingViewers");
                 RefreshUsers();
             }
         }
@@ -384,21 +237,21 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
-        private bool showMissingViewers_ = true;
-        public bool ShowMissingViewers {
+        private bool showKnownBotViewers_ = true;
+        public bool ShowKnownBotViewers {
             get {
-                return showMissingViewers_;
+                return showKnownBotViewers_;
             }
             set {
-                if (ShowMissingViewers == value) {
+                if (ShowKnownBotViewers == value) {
                     return;
                 }
-                showMissingViewers_ = value;
+                showKnownBotViewers_ = value;
                 if (!value) {
                     showAllViewers_ = false;
                     NotifyPropertyChanged("ShowAllViewers");
                 }
-                NotifyPropertyChanged("ShowMissingViewers");
+                NotifyPropertyChanged("ShowKnownBotViewers");
                 RefreshUsers();
             }
         }
@@ -424,24 +277,135 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
-        private bool showChattingViewers_ = true;
-        public bool ShowChattingViewers {
+        private bool showModViewers_ = true;
+        public bool ShowModViewers {
             get {
-                return showChattingViewers_;
+                return showModViewers_;
             }
             set {
-                if (ShowChattingViewers == value) {
+                if (ShowModViewers == value) {
                     return;
                 }
-                showChattingViewers_ = value;
-                ShowRecentlyChattingViewers = value;
+                showModViewers_ = value;
                 if (!value) {
                     showAllViewers_ = false;
-                    showCurrentViewers_ = false;
                     NotifyPropertyChanged("ShowAllViewers");
-                    NotifyPropertyChanged("ShowCurrentViewers");
                 }
-                NotifyPropertyChanged("ShowChattingViewers");
+                NotifyPropertyChanged("ShowModViewers");
+                RefreshUsers();
+            }
+        }
+
+        private bool showMissingViewers_ = true;
+        public bool ShowMissingViewers {
+            get {
+                return showMissingViewers_;
+            }
+            set {
+                if (ShowMissingViewers == value) {
+                    return;
+                }
+                showMissingViewers_ = value;
+                if (!value) {
+                    showAllViewers_ = false;
+                    NotifyPropertyChanged("ShowAllViewers");
+                }
+                NotifyPropertyChanged("ShowMissingViewers");
+                RefreshUsers();
+            }
+        }
+
+        private bool showNonBotViewers_ = true;
+        public bool ShowNonBotViewers {
+            get {
+                return showNonBotViewers_;
+            }
+            set {
+                if (ShowNonBotViewers == value) {
+                    return;
+                }
+                showNonBotViewers_ = value;
+                if (!value) {
+                    showAllViewers_ = false;
+                    NotifyPropertyChanged("ShowAllViewers");
+                }
+                NotifyPropertyChanged("ShowNonBotViewers");
+                RefreshUsers();
+            }
+        }
+
+        private bool showNonTimedOutViewers_ = true;
+        public bool ShowNonTimedOutViewers {
+            get {
+                return showNonTimedOutViewers_;
+            }
+            set {
+                if (ShowNonTimedOutViewers == value) {
+                    return;
+                }
+                showNonTimedOutViewers_ = value;
+                if (!value) {
+                    showAllViewers_ = false;
+                    NotifyPropertyChanged("ShowAllViewers");
+                }
+                NotifyPropertyChanged("ShowNonTimedOutViewers");
+                RefreshUsers();
+            }
+        }
+
+        private bool showNonWhitelistedViewers_ = true;
+        public bool ShowNonWhitelistedViewers {
+            get {
+                return showNonWhitelistedViewers_;
+            }
+            set {
+                if (ShowNonWhitelistedViewers == value) {
+                    return;
+                }
+                showNonWhitelistedViewers_ = value;
+                if (!value) {
+                    showAllViewers_ = false;
+                    NotifyPropertyChanged("ShowAllViewers");
+                }
+                NotifyPropertyChanged("ShowNonWhitelistedViewers");
+                RefreshUsers();
+            }
+        }
+
+        private bool showPlebViewers_ = true;
+        public bool ShowPlebViewers {
+            get {
+                return showPlebViewers_;
+            }
+            set {
+                if (ShowPlebViewers == value) {
+                    return;
+                }
+                showPlebViewers_ = value;
+                if (!value) {
+                    showAllViewers_ = false;
+                    NotifyPropertyChanged("ShowAllViewers");
+                }
+                NotifyPropertyChanged("ShowPlebViewers");
+                RefreshUsers();
+            }
+        }
+
+        private bool showPossibleBotViewers_ = true;
+        public bool ShowPossibleBotViewers {
+            get {
+                return showPossibleBotViewers_;
+            }
+            set {
+                if (ShowPossibleBotViewers == value) {
+                    return;
+                }
+                showPossibleBotViewers_ = value;
+                if (!value) {
+                    showAllViewers_ = false;
+                    NotifyPropertyChanged("ShowAllViewers");
+                }
+                NotifyPropertyChanged("ShowPossibleBotViewers");
                 RefreshUsers();
             }
         }
@@ -469,6 +433,101 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        private bool showTimedOutViewers_ = true;
+        public bool ShowTimedOutViewers {
+            get {
+                return showTimedOutViewers_;
+            }
+            set {
+                if (ShowTimedOutViewers == value) {
+                    return;
+                }
+                showTimedOutViewers_ = value;
+                if (!value) {
+                    showAllViewers_ = false;
+                    NotifyPropertyChanged("ShowAllViewers");
+                }
+                NotifyPropertyChanged("ShowTimedOutViewers");
+                RefreshUsers();
+            }
+        }
+
+        private bool showUnknownViewers_ = true;
+        public bool ShowUnknownViewers {
+            get {
+                return showUnknownViewers_;
+            }
+            set {
+                if (ShowUnknownViewers == value) {
+                    return;
+                }
+                showUnknownViewers_ = value;
+                if (!value) {
+                    showAllViewers_ = false;
+                    NotifyPropertyChanged("ShowAllViewers");
+                }
+                NotifyPropertyChanged("ShowUnknownViewers");
+                RefreshUsers();
+            }
+        }
+
+        private bool showUnwatchedViewers_ = true;
+        public bool ShowUnwatchedViewers {
+            get {
+                return showUnwatchedViewers_;
+            }
+            set {
+                if (ShowUnwatchedViewers == value) {
+                    return;
+                }
+                showUnwatchedViewers_ = value;
+                if (!value) {
+                    showAllViewers_ = false;
+                    NotifyPropertyChanged("ShowAllViewers");
+                }
+                NotifyPropertyChanged("ShowUnwatchedViewers");
+                RefreshUsers();
+            }
+        }
+
+        private bool showVipViewers_ = true;
+        public bool ShowVipViewers {
+            get {
+                return showVipViewers_;
+            }
+            set {
+                if (ShowVipViewers == value) {
+                    return;
+                }
+                showVipViewers_ = value;
+                if (!value) {
+                    showAllViewers_ = false;
+                    NotifyPropertyChanged("ShowAllViewers");
+                }
+                NotifyPropertyChanged("ShowVipViewers");
+                RefreshUsers();
+            }
+        }
+
+        private bool showWatchedViewers_ = true;
+        public bool ShowWatchedViewers {
+            get {
+                return showWatchedViewers_;
+            }
+            set {
+                if (ShowWatchedViewers == value) {
+                    return;
+                }
+                showWatchedViewers_ = value;
+                if (!value) {
+                    showAllViewers_ = false;
+                    NotifyPropertyChanged("ShowAllViewers");
+                }
+                NotifyPropertyChanged("ShowWatchedViewers");
+                RefreshUsers();
+            }
+        }
+
         private bool showWhitelistedViewers_ = true;
         public bool ShowWhitelistedViewers {
             get {
@@ -484,25 +543,6 @@ namespace Bouncer.Wpf.Model {
                     NotifyPropertyChanged("ShowAllViewers");
                 }
                 NotifyPropertyChanged("ShowWhitelistedViewers");
-                RefreshUsers();
-            }
-        }
-
-        private bool showNonWhitelistedViewers_ = true;
-        public bool ShowNonWhitelistedViewers {
-            get {
-                return showNonWhitelistedViewers_;
-            }
-            set {
-                if (ShowNonWhitelistedViewers == value) {
-                    return;
-                }
-                showNonWhitelistedViewers_ = value;
-                if (!value) {
-                    showAllViewers_ = false;
-                    NotifyPropertyChanged("ShowAllViewers");
-                }
-                NotifyPropertyChanged("ShowNonWhitelistedViewers");
                 RefreshUsers();
             }
         }
@@ -533,6 +573,18 @@ namespace Bouncer.Wpf.Model {
 
         public void SetBotStatus(User user, Bouncer.User.Bot bot) {
             Native.SetBotStatus(user.Id, bot);
+        }
+
+        public void SetNote(User user, string note) {
+            Native.SetNote(user.Id, note);
+        }
+
+        public void StartWatching(User user) {
+            Native.StartWatching(user.Id);
+        }
+
+        public void StopWatching(User user) {
+            Native.StopWatching(user.Id);
         }
 
         public void Unban(User user) {
@@ -654,6 +706,11 @@ namespace Bouncer.Wpf.Model {
                 if (ShowWhitelistedViewers) show = true;
             } else {
                 if (ShowNonWhitelistedViewers) show = true;
+            }
+            if (user.watching) {
+                if (ShowWatchedViewers) show = true;
+            } else {
+                if (ShowUnwatchedViewers) show = true;
             }
             return show;
         }

@@ -49,8 +49,22 @@ namespace Bouncer.Wpf.View {
 
         private void OnConfigure(object sender, ExecutedRoutedEventArgs e) {
             ConfigurationWindow configurationWindow = new ConfigurationWindow();
+            configurationWindow.Owner = this;
             configurationWindow.Model = Model;
             configurationWindow.ShowDialog();
+        }
+
+        private void OnEditNote(object sender, ExecutedRoutedEventArgs e) {
+            var user = e.Parameter as Model.User;
+            if (user == null) {
+                return;
+            }
+            EditNoteWindow editNoteWindow = new EditNoteWindow();
+            editNoteWindow.Owner = this;
+            editNoteWindow.Model = new Model.UserNote(user);
+            if (editNoteWindow.ShowDialog() ?? false) {
+                Model.SetNote(user, editNoteWindow.Model.Note);
+            }
         }
 
         private void OnExit(object sender, ExecutedRoutedEventArgs e) {
@@ -114,6 +128,22 @@ namespace Bouncer.Wpf.View {
                 return;
             }
             Model.SetBotStatus(user, User.Bot.Unknown);
+        }
+
+        private void OnStartWatching(object sender, ExecutedRoutedEventArgs e) {
+            var user = e.Parameter as Model.User;
+            if (user == null) {
+                return;
+            }
+            Model.StartWatching(user);
+        }
+
+        private void OnStopWatching(object sender, ExecutedRoutedEventArgs e) {
+            var user = e.Parameter as Model.User;
+            if (user == null) {
+                return;
+            }
+            Model.StopWatching(user);
         }
 
         private void OnUnban(object sender, ExecutedRoutedEventArgs e) {

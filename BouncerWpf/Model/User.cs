@@ -33,6 +33,12 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public string EditNoteMenuItemHeader {
+            get {
+                return "Edit Note";
+            }
+        }
+
         public double FirstMessageTime { get; private set; }
 
         public string FirstMessageTimeFormatted {
@@ -80,22 +86,6 @@ namespace Bouncer.Wpf.Model {
         }
 
         public string Login { get; private set; }
-        public string Name { get; private set; }
-        public double PartTime { get; private set; }
-
-        public string PartTimeFormatted {
-            get {
-                return Utilities.FormatAbsoluteTime(PartTime);
-            }
-        }
-
-        public double TotalViewTime { get; private set; }
-
-        public string TotalViewTimeFormatted {
-            get {
-                return Utilities.FormatDeltaTime(TotalViewTime);
-            }
-        }
 
         public string MarkBotMenuItemHeader {
             get {
@@ -133,8 +123,10 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public string Name { get; private set; }
         public uint NumMessages { get; private set; }
         public uint NumMessagesThisInstance { get; private set; }
+        public string Note { get; private set; }
 
         public string NumMessagesReport {
             get {
@@ -146,8 +138,48 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public double PartTime { get; private set; }
+
+        public string PartTimeFormatted {
+            get {
+                return Utilities.FormatAbsoluteTime(PartTime);
+            }
+        }
+
         public Bouncer.User.Role Role { get; private set; }
+
+        public string StartWatchingMenuItemHeader {
+            get {
+                return String.Format("Start Watching {0}", Name);
+            }
+        }
+
+        public Visibility StartWatchingMenuItemVisibility {
+            get {
+                return Watching ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
+        public string StopWatchingMenuItemHeader {
+            get {
+                return String.Format("Stop Watching {0}", Name);
+            }
+        }
+
+        public Visibility StopWatchingMenuItemVisibility {
+            get {
+                return Watching ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
         public double Timeout { get; private set; }
+        public double TotalViewTime { get; private set; }
+
+        public string TotalViewTimeFormatted {
+            get {
+                return Utilities.FormatDeltaTime(TotalViewTime);
+            }
+        }
 
         public string TimeoutFormatted {
             get {
@@ -179,6 +211,8 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public bool Watching { get; private set; }
+
         public string WhitelistMenuItemHeader {
             get {
                 return String.Format("Whitelist {0}", Name);
@@ -204,11 +238,13 @@ namespace Bouncer.Wpf.Model {
             Id = native.id;
             IsBanned = native.isBanned;
             IsJoined = native.isJoined;
+            Watching = native.watching;
             IsWhitelisted = native.isWhitelisted;
             JoinTime = native.joinTime;
             LastMessageTime = native.lastMessageTime;
             Login = native.login;
             Name = native.name;
+            Note = native.note;
             PartTime = native.partTime;
             TotalViewTime = native.totalViewTime;
             NumMessages = native.numMessages;
@@ -263,6 +299,12 @@ namespace Bouncer.Wpf.Model {
                 IsJoined = native.isJoined;
                 NotifyPropertyChanged("IsJoined");
             }
+            if (Watching != native.watching) {
+                Watching = native.watching;
+                NotifyPropertyChanged("Watching");
+                NotifyPropertyChanged("StartWatchingMenuItemVisibility");
+                NotifyPropertyChanged("StopWatchingMenuItemVisibility");
+            }
             if (JoinTime != native.joinTime) {
                 JoinTime = native.joinTime;
                 NotifyPropertyChanged("JoinTime");
@@ -282,6 +324,14 @@ namespace Bouncer.Wpf.Model {
                 NotifyPropertyChanged("Name");
                 NotifyPropertyChanged("BanMenuItemHeader");
                 NotifyPropertyChanged("UnbanMenuItemHeader");
+                NotifyPropertyChanged("StartWatchingMenuItemHeader");
+                NotifyPropertyChanged("StopWatchingMenuItemHeader");
+                NotifyPropertyChanged("UnwhitelistMenuItemHeader");
+                NotifyPropertyChanged("WhitelistMenuItemHeader");
+            }
+            if (Note != native.note) {
+                Note = native.note;
+                NotifyPropertyChanged("Note");
             }
             if (PartTime != native.partTime) {
                 PartTime = native.partTime;

@@ -23,6 +23,7 @@ if(MSVC)
         Model/Main.cs
         Model/Message.cs
         Model/User.cs
+        Model/UserNote.cs
         ObservableStdVector.cs
         Properties/AssemblyInfo.cs
         Properties/Resources.resx
@@ -31,6 +32,8 @@ if(MSVC)
         View/Commands.cs
         View/ConfigurationWindow.xaml
         View/ConfigurationWindow.xaml.cs
+        View/EditNoteWindow.xaml
+        View/EditNoteWindow.xaml.cs
         View/FindDescendant.cs
         View/ListBoxExtensions.cs
         View/MainWindow.xaml

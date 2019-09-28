@@ -50,6 +50,8 @@ namespace Bouncer {
 
         void SetConfiguration(const Configuration& configuration);
 
+        void SetNote(intmax_t userid, const std::string& note);
+
         /**
          * Begin the background processing of the application.
          *
@@ -60,7 +62,11 @@ namespace Bouncer {
 
         void StartViewTimer();
 
+        void StartWatching(intmax_t userid);
+
         void StopViewTimer();
+
+        void StopWatching(intmax_t userid);
 
         void Unban(intmax_t userid);
 
