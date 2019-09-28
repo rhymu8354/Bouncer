@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Threading;
 
 namespace Bouncer.Wpf.Model {
@@ -536,6 +537,10 @@ namespace Bouncer.Wpf.Model {
             HostFacet = new Host(this);
             Native.StartApplication(HostFacet);
             Stats = Native.GetStats();
+            var usersListLiveShaping = CollectionViewSource.GetDefaultView(Users) as ICollectionViewLiveShaping;
+            if (usersListLiveShaping != null) {
+                usersListLiveShaping.IsLiveSorting = true;
+            }
             RefreshUsers();
             RefreshTimer.Tick += OnRefreshTimerTick;
             RefreshTimer.Interval = new TimeSpan(0, 0, 1);
