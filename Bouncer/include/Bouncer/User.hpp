@@ -48,6 +48,8 @@ namespace Bouncer {
             VIP,
             Moderator,
             Broadcaster,
+            Admin,
+            Staff,
         } role = Role::Unknown;
     };
 

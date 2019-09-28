@@ -619,6 +619,8 @@ namespace Bouncer.Wpf.Model {
             if (!show) return false;
             show = false;
             switch (user.role) {
+                case Bouncer.User.Role.Staff:
+                case Bouncer.User.Role.Admin:
                 case Bouncer.User.Role.Broadcaster:
                 case Bouncer.User.Role.Moderator:
                     if (ShowModViewers) show = true;

@@ -570,7 +570,11 @@ namespace Bouncer {
                 }
                 if (userEncoded.Has("role")) {
                     const auto role = (std::string)userEncoded["role"];
-                    if (role == "broadcaster") {
+                    if (role == "staff") {
+                        user.role = User::Role::Staff;
+                    } else if (role == "admin") {
+                        user.role = User::Role::Admin;
+                    } else if (role == "broadcaster") {
                         user.role = User::Role::Broadcaster;
                     } else if (role == "moderator") {
                         user.role = User::Role::Moderator;
@@ -1179,6 +1183,14 @@ namespace Bouncer {
                     default: break;
                 }
                 switch (user.role) {
+                    case User::Role::Staff: {
+                        userEncoded["role"] = "staff";
+                    } break;
+
+                    case User::Role::Admin: {
+                        userEncoded["role"] = "admin";
+                    } break;
+
                     case User::Role::Broadcaster: {
                         userEncoded["role"] = "broadcaster";
                     } break;
@@ -1260,6 +1272,12 @@ namespace Bouncer {
                         return;
                     } else if (badgeParts[0] == "broadcaster") {
                         user.role = User::Role::Broadcaster;
+                        return;
+                    } else if (badgeParts[0] == "admin") {
+                        user.role = User::Role::Admin;
+                        return;
+                    } else if (badgeParts[0] == "staff") {
+                        user.role = User::Role::Staff;
                         return;
                     }
                 }
