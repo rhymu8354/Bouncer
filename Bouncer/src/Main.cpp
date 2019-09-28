@@ -1382,7 +1382,7 @@ namespace Bouncer {
             );
             stats.maxViewerCountThisInstance = std::max(
                 stats.maxViewerCountThisInstance,
-                stats.maxViewerCount
+                stats.currentViewerCount
             );
         }
 
