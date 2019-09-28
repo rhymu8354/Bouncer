@@ -1261,6 +1261,7 @@ namespace Bouncer {
             User& user,
             const std::set< std::string >& badges
         ) {
+            user.role = User::Role::Pleb;
             for (const auto& badge: badges) {
                 const auto badgeParts = SystemAbstractions::Split(badge, '/');
                 if (badgeParts.size() >= 1) {
