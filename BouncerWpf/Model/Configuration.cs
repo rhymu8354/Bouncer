@@ -118,6 +118,16 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public string NewAccountChatterTimeoutExplanation {
+            get {
+                return Adaptee.newAccountChatterTimeoutExplanation;
+            }
+            set {
+                Adaptee.newAccountChatterTimeoutExplanation = value;
+                NotifyPropertyChanged("NewAccountChatterTimeoutExplanation");
+            }
+        }
+
         public double RecentChatThreshold {
             get {
                 return Adaptee.recentChatThreshold;

@@ -31,6 +31,7 @@
 #include <TlsDecorator/TlsDecorator.hpp>
 #include <Twitch/Messaging.hpp>
 #include <TwitchNetworkTransport/Connection.hpp>
+#include <sstream>
 #include <SystemAbstractions/DiagnosticsSender.hpp>
 #include <SystemAbstractions/DiagnosticsStreamReporter.hpp>
 #include <SystemAbstractions/File.hpp>
@@ -44,6 +45,64 @@ namespace {
     const auto configurationFilePath = SystemAbstractions::File::GetExeParentDirectory() + "/Bouncer.json";
     constexpr size_t maxTwitchUserLookupsByLogin = 100;
     constexpr double twitchApiLookupCooldown = 1.0;
+    constexpr int maxTimeoutSeconds = 1209600;
+
+    std::string InstantiateTemplate(
+        const std::string& templateText,
+        const std::map< std::string, std::string >& variables
+    ) {
+        std::ostringstream builder;
+        enum class State {
+            Normal,
+            Escape,
+            TokenStart,
+            Token,
+        } state = State::Normal;
+        std::string token;
+        for (auto c: templateText) {
+            switch (state) {
+                case State::Normal: {
+                    if (c == '\\') {
+                        state = State::Escape;
+                    } else if (c == '$') {
+                        state = State::TokenStart;
+                    } else {
+                        builder << c;
+                    }
+                } break;
+
+                case State::Escape: {
+                    state = State::Normal;
+                    builder << c;
+                } break;
+
+                case State::TokenStart: {
+                    if (c == '{') {
+                        state = State::Token;
+                        token.clear();
+                    } else {
+                        state = State::Normal;
+                        builder << '$' << c;
+                    }
+                } break;
+
+                case State::Token: {
+                    if (c == '}') {
+                        const auto variablesEntry = variables.find(token);
+                        if (variablesEntry != variables.end()) {
+                            builder << variablesEntry->second;
+                        }
+                        state = State::Normal;
+                    } else {
+                        token += c;
+                    }
+                } break;
+
+                default: break;
+            }
+        }
+        return builder.str();
+    }
 
     /**
      * This function loads the contents of the file with the given path
@@ -548,6 +607,7 @@ namespace Bouncer {
             configuration.clientId = (std::string)json["clientId"];
             configuration.channel = (std::string)json["channel"];
             configuration.greetingPattern = (std::string)json["greetingPattern"];
+            configuration.newAccountChatterTimeoutExplanation = (std::string)json["newAccountChatterTimeoutExplanation"];
             configuration.newAccountAgeThreshold = (double)json["newAccountAgeThreshold"];
             configuration.recentChatThreshold = (double)json["recentChatThreshold"];
             configuration.minDiagnosticsLevel = (size_t)json["minDiagnosticsLevel"];
@@ -832,6 +892,49 @@ namespace Bouncer {
                                 }
                             }
                         }
+                    }
+                    if (
+                        configuration.autoTimeOutNewAccountChatters
+                        && (user.role == User::Role::Pleb)
+                        && !user.isWhitelisted
+                        && (messageTime - user.createdAt < configuration.newAccountAgeThreshold)
+                    ) {
+                        user.needsGreeting = false;
+                        const auto seconds = std::min(
+                            (int)ceil(
+                                configuration.newAccountAgeThreshold
+                                - (user.createdAt - messageTime)
+                            ),
+                            maxTimeoutSeconds
+                        );
+                        diagnosticsSender.SendDiagnosticInformationFormatted(
+                            3,
+                            "New account chatter %" PRIdMAX " (%s) -- timing out user for %d seconds",
+                            usersByIdEntry->second.id,
+                            usersByIdEntry->second.login.c_str(),
+                            seconds
+                        );
+                        if (!configuration.newAccountChatterTimeoutExplanation.empty()) {
+                            std::map< std::string, std::string > variables;
+                            variables["login"] = user.login;
+                            variables["name"] = user.name;
+                            const auto explanation = InstantiateTemplate(
+                                configuration.newAccountChatterTimeoutExplanation,
+                                variables
+                            );
+                            tmi.SendMessage(
+                                configuration.channel,
+                                explanation
+                            );
+                        }
+                        tmi.SendMessage(
+                            configuration.channel,
+                            SystemAbstractions::sprintf(
+                                "/timeout %s %d",
+                                usersByIdEntry->second.login.c_str(),
+                                seconds
+                            )
+                        );
                     }
                 }
             }
@@ -1223,6 +1326,7 @@ namespace Bouncer {
                 {"clientId", configuration.clientId},
                 {"channel", configuration.channel},
                 {"greetingPattern", configuration.greetingPattern},
+                {"newAccountChatterTimeoutExplanation", configuration.newAccountChatterTimeoutExplanation},
                 {"newAccountAgeThreshold", configuration.newAccountAgeThreshold},
                 {"recentChatThreshold", configuration.recentChatThreshold},
                 {"minDiagnosticsLevel", configuration.minDiagnosticsLevel},
