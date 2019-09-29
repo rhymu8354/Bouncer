@@ -332,6 +332,7 @@ namespace Bouncer {
                 if (impl == nullptr) {
                     return;
                 }
+                impl->OnNotice(std::move(noticeInfo));
             }
 
             virtual void Host(Twitch::Messaging::HostInfo&& hostInfo) override {
@@ -997,6 +998,16 @@ namespace Bouncer {
         void OnNameList(Twitch::Messaging::NameListInfo&& nameListInfo) {
             std::lock_guard< decltype(mutex) > lock(mutex);
             UsersJoined(std::move(nameListInfo.names));
+        }
+
+        void OnNotice(Twitch::Messaging::NoticeInfo&& noticeInfo) {
+            std::lock_guard< decltype(mutex) > lock(mutex);
+            diagnosticsSender.SendDiagnosticInformationFormatted(
+                3,
+                "Received notice (id=\"%s\"): %s",
+                noticeInfo.id.c_str(),
+                noticeInfo.message.c_str()
+            );
         }
 
         void PostApiCall(std::function< void() > apiCall) {
