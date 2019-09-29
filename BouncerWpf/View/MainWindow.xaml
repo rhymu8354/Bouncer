@@ -103,6 +103,7 @@
                             </Style>
                         </MenuItem.Style>
                         <MenuItem Header="{Binding TimeOut1sMenuItemHeader}" Command="local:Commands.TimeOut" CommandParameter="{Binding Timeout1s}" />
+                        <MenuItem Header="{Binding TimeOut1mMenuItemHeader}" Command="local:Commands.TimeOut" CommandParameter="{Binding Timeout1m}" />
                         <MenuItem Header="{Binding TimeOut10mMenuItemHeader}" Command="local:Commands.TimeOut" CommandParameter="{Binding Timeout10m}" />
                         <MenuItem Header="{Binding TimeOut1hMenuItemHeader}" Command="local:Commands.TimeOut" CommandParameter="{Binding Timeout1h}" />
                         <MenuItem Header="{Binding TimeOut6hMenuItemHeader}" Command="local:Commands.TimeOut" CommandParameter="{Binding Timeout6h}" />

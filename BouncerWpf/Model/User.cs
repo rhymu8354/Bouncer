@@ -212,6 +212,16 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public UserTimeout Timeout1m {
+            get {
+                var timeout = new UserTimeout {
+                    User = this,
+                    Period = 60
+                };
+                return timeout;
+            }
+        }
+
         public UserTimeout Timeout10m {
             get {
                 var timeout = new UserTimeout {
@@ -261,6 +271,12 @@ namespace Bouncer.Wpf.Model {
         public string TimeOut1sMenuItemHeader {
             get {
                 return String.Format("Time out {0} for 1 second", Name);
+            }
+        }
+
+        public string TimeOut1mMenuItemHeader {
+            get {
+                return String.Format("Time out {0} for 1 minute", Name);
             }
         }
 
