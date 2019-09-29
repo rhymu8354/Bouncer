@@ -778,7 +778,7 @@ namespace Bouncer {
                         user.firstMessageTimeThisInstance = messageTime;
                     }
                     UpdateRole(user, messageInfo.tags.badges);
-                    if (configuration.minDiagnosticsLevel >= 3) {
+                    if (configuration.minDiagnosticsLevel <= 3) {
                         if (messageInfo.isAction) {
                             QueueStatus(
                                 3,
