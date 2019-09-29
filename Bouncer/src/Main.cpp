@@ -935,29 +935,6 @@ namespace Bouncer {
             HandleClear(std::move(clearInfo), timeKeeper->GetCurrentTime());
         }
 
-        void OnLogIn() {
-            std::lock_guard< decltype(mutex) > lock(mutex);
-            PostStatus("Logged in");
-            if (state == State::Unconnected) {
-                state = State::OutsideRoom;
-                tmi.Join(configuration.channel);
-            }
-        }
-
-        void OnLogOut() {
-            std::lock_guard< decltype(mutex) > lock(mutex);
-            switch (state) {
-                case State::OutsideRoom:
-                case State::InsideRoom: {
-                    loggedOut.set_value();
-                    PostStatus("Logged out");
-                    state = State::Unconnected;
-                } break;
-
-                default: break;
-            }
-        }
-
         void OnJoin(Twitch::Messaging::MembershipInfo&& membershipInfo) {
             std::lock_guard< decltype(mutex) > lock(mutex);
             if (membershipInfo.user == configuration.account) {
@@ -987,6 +964,29 @@ namespace Bouncer {
                         );
                     }
                 }
+            }
+        }
+
+        void OnLogIn() {
+            std::lock_guard< decltype(mutex) > lock(mutex);
+            PostStatus("Logged in");
+            if (state == State::Unconnected) {
+                state = State::OutsideRoom;
+                tmi.Join(configuration.channel);
+            }
+        }
+
+        void OnLogOut() {
+            std::lock_guard< decltype(mutex) > lock(mutex);
+            switch (state) {
+                case State::OutsideRoom:
+                case State::InsideRoom: {
+                    loggedOut.set_value();
+                    PostStatus("Logged out");
+                    state = State::Unconnected;
+                } break;
+
+                default: break;
             }
         }
 
