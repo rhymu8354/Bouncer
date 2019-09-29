@@ -42,6 +42,7 @@
 namespace {
 
     constexpr double configurationAutoSaveCooldown = 60.0;
+    constexpr double streamCheckCooldown = 600.0;
     const auto configurationFilePath = SystemAbstractions::File::GetExeParentDirectory() + "/Bouncer.json";
     constexpr size_t maxTwitchUserLookupsByLogin = 100;
     constexpr double twitchApiLookupCooldown = 1.0;
@@ -479,12 +480,15 @@ namespace Bouncer {
          */
         int nextHttpClientTransactionId = 1;
 
+        double nextStreamCheck = 0.0;
         std::weak_ptr< Impl > selfWeak;
         State state = State::Unconfigured;
         Stats stats;
         AsyncData::MultiProducerSingleConsumerQueue< StatusMessage > statusMessages;
         bool stopDiagnosticsWorker = false;
         bool stopWorker = false;
+        bool firstStreamTitleCheck = true;
+        std::string streamTitle;
         SystemAbstractions::DiagnosticsSender::UnsubscribeDelegate unsubscribeLogFileWriter;
         SystemAbstractions::DiagnosticsSender::UnsubscribeDelegate unsubscribeStatusMessages;
         std::map< std::string, intmax_t > userIdsByLogin;
@@ -910,8 +914,8 @@ namespace Bouncer {
                         diagnosticsSender.SendDiagnosticInformationFormatted(
                             3,
                             "New account chatter %" PRIdMAX " (%s) -- timing out user for %d seconds",
-                            usersByIdEntry->second.id,
-                            usersByIdEntry->second.login.c_str(),
+                            user.id,
+                            user.login.c_str(),
                             seconds
                         );
                         if (!configuration.newAccountChatterTimeoutExplanation.empty()) {
@@ -931,8 +935,30 @@ namespace Bouncer {
                             configuration.channel,
                             SystemAbstractions::sprintf(
                                 "/timeout %s %d",
-                                usersByIdEntry->second.login.c_str(),
+                                user.login.c_str(),
                                 seconds
+                            )
+                        );
+                    }
+                    if (
+                        configuration.autoBanTitleScammers
+                        && !streamTitle.empty()
+                        && (user.role == User::Role::Pleb)
+                        && !user.isWhitelisted
+                        && (messageInfo.messageContent.find(streamTitle) != std::string::npos)
+                    ) {
+                        user.needsGreeting = false;
+                        diagnosticsSender.SendDiagnosticInformationFormatted(
+                            3,
+                            "Low-effort spam bot %" PRIdMAX " (%s) detected -- applying ban hammer",
+                            user.id,
+                            user.login.c_str()
+                        );
+                        tmi.SendMessage(
+                            configuration.channel,
+                            SystemAbstractions::sprintf(
+                                "/ban %s",
+                                user.login.c_str()
                             )
                         );
                     }
@@ -950,6 +976,7 @@ namespace Bouncer {
             );
             PostApiCall(
                 targetUriString,
+                true,
                 [
                     after,
                     userid
@@ -1120,6 +1147,7 @@ namespace Bouncer {
 
         void PostApiCall(
             const std::string& targetUriString,
+            bool isKraken,
             std::function<
                 void(
                     Impl& impl,
@@ -1130,6 +1158,7 @@ namespace Bouncer {
         ) {
             PostApiCall(
                 [
+                    isKraken,
                     onCompletion,
                     targetUriString,
                     this
@@ -1147,7 +1176,9 @@ namespace Bouncer {
                     request.target.ParseFromString(targetUriString);
                     request.target.SetPort(443);
                     request.headers.SetHeader("Client-ID", configuration.clientId);
-                    request.headers.SetHeader("Accept", "application/vnd.twitchtv.v5+json");
+                    if (isKraken) {
+                        request.headers.SetHeader("Accept", "application/vnd.twitchtv.v5+json");
+                    }
                     auto& httpClientTransaction = httpClientTransactions[id];
                     httpClientTransaction = httpClient->Request(request);
                     auto selfWeakCopy(selfWeak);
@@ -1208,6 +1239,7 @@ namespace Bouncer {
             }
             PostApiCall(
                 targetUriString,
+                true,
                 [](
                     Impl& impl,
                     int id,
@@ -1448,6 +1480,71 @@ namespace Bouncer {
             worker.join();
         }
 
+        void StreamCheck() {
+            const auto now = timeKeeper->GetCurrentTime();
+            nextStreamCheck = now + streamCheckCooldown;
+            if (configuration.channel.empty()) {
+                return;
+            }
+            const auto targetUriString = (
+                std::string("https://api.twitch.tv/helix/streams?user_login=")
+                + configuration.channel
+            );
+            PostApiCall(
+                targetUriString,
+                false,
+                [](
+                    Impl& impl,
+                    int id,
+                    const Http::IClient::Transaction& transaction
+                ){
+                    if (transaction.response.statusCode == 200) {
+                        const auto data = Json::Value::FromEncoding(transaction.response.body)["data"];
+                        if (data.GetSize() == 0) {
+                            if (impl.streamTitle.empty()) {
+                                if (impl.firstStreamTitleCheck) {
+                                    impl.diagnosticsSender.SendDiagnosticInformationString(
+                                        3,
+                                        "The stream is offline"
+                                    );
+                                }
+                            } else {
+                                impl.streamTitle.clear();
+                                impl.diagnosticsSender.SendDiagnosticInformationString(
+                                    3,
+                                    "The stream has ended"
+                                );
+                            }
+                        } else {
+                            const auto title = (std::string)data[0]["title"];
+                            if (impl.streamTitle.empty()) {
+                                impl.diagnosticsSender.SendDiagnosticInformationString(
+                                    3,
+                                    "The stream has started"
+                                );
+                            }
+                            if (impl.streamTitle != title) {
+                                impl.diagnosticsSender.SendDiagnosticInformationFormatted(
+                                    3,
+                                    "Stream title: %s",
+                                    title.c_str()
+                                );
+                                impl.streamTitle = title;
+                            }
+                        }
+                    } else {
+                        impl.diagnosticsSender.SendDiagnosticInformationFormatted(
+                            SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                            "Twitch API call %d returned code %d",
+                            id,
+                            transaction.response.statusCode
+                        );
+                    }
+                    impl.firstStreamTitleCheck = false;
+                }
+            );
+        }
+
         void UpdateRole(
             User& user,
             const std::set< std::string >& badges
@@ -1650,16 +1747,22 @@ namespace Bouncer {
                     HandleConfigurationChanged();
                 }
                 auto now = timeKeeper->GetCurrentTime();
+                if (now >= nextConfigurationAutoSaveTime) {
+                    SaveConfiguration();
+                }
+                if (now >= nextStreamCheck) {
+                    StreamCheck();
+                }
                 if (
                     !apiCallInProgress
                     && (now >= nextApiCallTime)
                 ) {
                     NextApiCall();
                 }
-                if (now >= nextConfigurationAutoSaveTime) {
-                    SaveConfiguration();
-                }
-                auto nextTimeout = nextConfigurationAutoSaveTime;
+                auto nextTimeout = std::min(
+                    nextConfigurationAutoSaveTime,
+                    nextStreamCheck
+                );
                 if (
                     !apiCallInProgress
                     && (nextApiCallTime != 0.0)
