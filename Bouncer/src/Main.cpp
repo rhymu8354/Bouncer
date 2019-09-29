@@ -767,28 +767,30 @@ namespace Bouncer {
                         user.firstMessageTimeThisInstance = messageTime;
                     }
                     UpdateRole(user, messageInfo.tags.badges);
-                    if (messageInfo.isAction) {
-                        QueueStatus(
-                            3,
-                            SystemAbstractions::sprintf(
-                                "[%s] %s %s",
-                                FormatTime(messageTime).c_str(),
-                                user.login.c_str(),
-                                messageInfo.messageContent.c_str()
-                            ),
-                            userid
-                        );
-                    } else {
-                        QueueStatus(
-                            3,
-                            SystemAbstractions::sprintf(
-                                "[%s] %s: %s",
-                                FormatTime(messageTime).c_str(),
-                                user.login.c_str(),
-                                messageInfo.messageContent.c_str()
-                            ),
-                            userid
-                        );
+                    if (configuration.minDiagnosticsLevel >= 3) {
+                        if (messageInfo.isAction) {
+                            QueueStatus(
+                                3,
+                                SystemAbstractions::sprintf(
+                                    "[%s] %s %s",
+                                    FormatTime(messageTime).c_str(),
+                                    user.login.c_str(),
+                                    messageInfo.messageContent.c_str()
+                                ),
+                                userid
+                            );
+                        } else {
+                            QueueStatus(
+                                3,
+                                SystemAbstractions::sprintf(
+                                    "[%s] %s: %s",
+                                    FormatTime(messageTime).c_str(),
+                                    user.login.c_str(),
+                                    messageInfo.messageContent.c_str()
+                                ),
+                                userid
+                            );
+                        }
                     }
                 }
             }
