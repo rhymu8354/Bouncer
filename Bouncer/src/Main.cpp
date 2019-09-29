@@ -425,6 +425,7 @@ namespace Bouncer {
         bool stopDiagnosticsWorker = false;
         bool stopWorker = false;
         SystemAbstractions::DiagnosticsSender::UnsubscribeDelegate unsubscribeLogFileWriter;
+        SystemAbstractions::DiagnosticsSender::UnsubscribeDelegate unsubscribeStatusMessages;
         std::map< std::string, intmax_t > userIdsByLogin;
         std::map< std::string, double > userJoinsByLogin;
         AsyncData::MultiProducerSingleConsumerQueue< std::string > userLookupsByLogin;
@@ -459,20 +460,7 @@ namespace Bouncer {
         Impl()
             : diagnosticsSender("Bouncer")
         {
-            diagnosticsSender.SubscribeToDiagnostics(
-                [this](
-                    std::string senderName,
-                    size_t level,
-                    std::string message
-                ){
-                    StatusMessage statusMessage;
-                    statusMessage.level = level;
-                    statusMessage.message = message;
-                    std::lock_guard< decltype(diagnosticsMutex) > lock(diagnosticsMutex);
-                    statusMessages.Add(std::move(statusMessage));
-                    wakeDiagnosticsWorker.notify_one();
-                }
-            );
+            HookDiagnostics();
         }
 
         void AwaitLogOut() {
@@ -493,6 +481,34 @@ namespace Bouncer {
                 wakeDiagnosticsWorker.wait(lock, workerWakeCondition);
             }
             WithoutLock(lock, [&]{ PublishMessages(); });
+        }
+
+        std::string FormatTime(double time) {
+            char buffer[9];
+            auto timeSeconds = (time_t)time;
+            (void)strftime(buffer, sizeof(buffer), "%H:%M:%S", gmtime(&timeSeconds));
+            return buffer;
+        }
+
+        void HookDiagnostics() {
+            if (unsubscribeStatusMessages != nullptr) {
+                unsubscribeStatusMessages();
+            }
+            unsubscribeStatusMessages = diagnosticsSender.SubscribeToDiagnostics(
+                [this](
+                    std::string senderName,
+                    size_t level,
+                    std::string message
+                ){
+                    StatusMessage statusMessage;
+                    statusMessage.level = level;
+                    statusMessage.message = message;
+                    std::lock_guard< decltype(diagnosticsMutex) > lock(diagnosticsMutex);
+                    statusMessages.Add(std::move(statusMessage));
+                    wakeDiagnosticsWorker.notify_one();
+                },
+                configuration.minDiagnosticsLevel
+            );
         }
 
         void LoadConfiguration() {
@@ -522,6 +538,7 @@ namespace Bouncer {
             configuration.channel = (std::string)json["channel"];
             configuration.newAccountAgeThreshold = (double)json["newAccountAgeThreshold"];
             configuration.recentChatThreshold = (double)json["recentChatThreshold"];
+            configuration.minDiagnosticsLevel = (size_t)json["minDiagnosticsLevel"];
             stats.maxViewerCount = (size_t)json["maxViewerCount"];
             stats.totalViewTimeRecorded = (double)json["totalViewTimeRecorded"];
             const auto& users = json["users"];
@@ -639,6 +656,7 @@ namespace Bouncer {
         }
 
         void HandleConfigurationChanged() {
+            HookDiagnostics();
             const bool isConfigured = (
                 !configuration.account.empty()
                 && !configuration.token.empty()
@@ -739,14 +757,23 @@ namespace Bouncer {
                         user.firstMessageTimeThisInstance = messageTime;
                     }
                     UpdateRole(user, messageInfo.tags.badges);
-                    diagnosticsSender.SendDiagnosticInformationFormatted(
-                        3,
-                        "Twitch user %" PRIdMAX " (%s) sent message #%zu at %lf",
-                        userid,
-                        user.login.c_str(),
-                        user.numMessages,
-                        user.lastMessageTime
-                    );
+                    if (messageInfo.isAction) {
+                        diagnosticsSender.SendDiagnosticInformationFormatted(
+                            3,
+                            "[%s] %s %s",
+                            FormatTime(messageTime).c_str(),
+                            user.login.c_str(),
+                            messageInfo.messageContent.c_str()
+                        );
+                    } else {
+                        diagnosticsSender.SendDiagnosticInformationFormatted(
+                            3,
+                            "[%s] %s: %s",
+                            FormatTime(messageTime).c_str(),
+                            user.login.c_str(),
+                            messageInfo.messageContent.c_str()
+                        );
+                    }
                 }
             }
         }
@@ -942,7 +969,7 @@ namespace Bouncer {
                     apiCallInProgress = true;
                     const auto id = nextHttpClientTransactionId++;
                     diagnosticsSender.SendDiagnosticInformationFormatted(
-                        2,
+                        0,
                         "Twitch API call %d: %s",
                         id,
                         targetUriString.c_str()
@@ -1131,6 +1158,7 @@ namespace Bouncer {
                 {"channel", configuration.channel},
                 {"newAccountAgeThreshold", configuration.newAccountAgeThreshold},
                 {"recentChatThreshold", configuration.recentChatThreshold},
+                {"minDiagnosticsLevel", configuration.minDiagnosticsLevel},
                 {"users", Json::Array({})},
                 {"maxViewerCount", stats.maxViewerCount},
                 {"totalViewTimeRecorded", totalViewTimeRecorded},
@@ -1300,7 +1328,7 @@ namespace Bouncer {
             user.isJoined = false;
             user.partTime = partTime;
             diagnosticsSender.SendDiagnosticInformationFormatted(
-                2,
+                1,
                 "User %" PRIdMAX " (%s) has parted",
                 userid,
                 user.login.c_str()
@@ -1321,7 +1349,7 @@ namespace Bouncer {
             user.isJoined = true;
             user.joinTime = joinTime;
             diagnosticsSender.SendDiagnosticInformationFormatted(
-                2,
+                1,
                 "User %" PRIdMAX " (%s) has joined (account age: %lf)",
                 userid,
                 user.login.c_str(),
