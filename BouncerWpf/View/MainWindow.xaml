@@ -296,8 +296,10 @@
         <ListBox
             Grid.Row="4"
             ItemsSource="{Binding Messages}"
+            SelectedItem="{Binding SelectedMessage}"
             Grid.IsSharedSizeScope="True"
             local:ListBoxExtensions.AutoScroll="True"
+            SelectionChanged="OnMessagesSelectionChanged"
         >
             <ListBox.ItemTemplate>
                 <DataTemplate>

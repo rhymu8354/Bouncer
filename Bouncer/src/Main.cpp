@@ -247,8 +247,9 @@ namespace Bouncer {
         };
 
         struct StatusMessage {
-            size_t level;
+            size_t level = 0;
             std::string message;
+            intmax_t userid = 0;
         };
 
         /**
@@ -500,15 +501,24 @@ namespace Bouncer {
                     size_t level,
                     std::string message
                 ){
-                    StatusMessage statusMessage;
-                    statusMessage.level = level;
-                    statusMessage.message = message;
-                    std::lock_guard< decltype(diagnosticsMutex) > lock(diagnosticsMutex);
-                    statusMessages.Add(std::move(statusMessage));
-                    wakeDiagnosticsWorker.notify_one();
+                    QueueStatus(level, message, 0);
                 },
                 configuration.minDiagnosticsLevel
             );
+        }
+
+        void QueueStatus(
+            size_t level,
+            const std::string& message,
+            intmax_t userid
+        ) {
+            StatusMessage statusMessage;
+            statusMessage.level = level;
+            statusMessage.message = message;
+            statusMessage.userid = userid;
+            std::lock_guard< decltype(diagnosticsMutex) > lock(diagnosticsMutex);
+            statusMessages.Add(std::move(statusMessage));
+            wakeDiagnosticsWorker.notify_one();
         }
 
         void LoadConfiguration() {
@@ -758,20 +768,26 @@ namespace Bouncer {
                     }
                     UpdateRole(user, messageInfo.tags.badges);
                     if (messageInfo.isAction) {
-                        diagnosticsSender.SendDiagnosticInformationFormatted(
+                        QueueStatus(
                             3,
-                            "[%s] %s %s",
-                            FormatTime(messageTime).c_str(),
-                            user.login.c_str(),
-                            messageInfo.messageContent.c_str()
+                            SystemAbstractions::sprintf(
+                                "[%s] %s %s",
+                                FormatTime(messageTime).c_str(),
+                                user.login.c_str(),
+                                messageInfo.messageContent.c_str()
+                            ),
+                            userid
                         );
                     } else {
-                        diagnosticsSender.SendDiagnosticInformationFormatted(
+                        QueueStatus(
                             3,
-                            "[%s] %s: %s",
-                            FormatTime(messageTime).c_str(),
-                            user.login.c_str(),
-                            messageInfo.messageContent.c_str()
+                            SystemAbstractions::sprintf(
+                                "[%s] %s: %s",
+                                FormatTime(messageTime).c_str(),
+                                user.login.c_str(),
+                                messageInfo.messageContent.c_str()
+                            ),
+                            userid
                         );
                     }
                 }
@@ -1137,7 +1153,8 @@ namespace Bouncer {
                 const auto statusMessage = statusMessages.Remove();
                 host->StatusMessage(
                     statusMessage.level,
-                    statusMessage.message
+                    statusMessage.message,
+                    statusMessage.userid
                 );
             }
         }

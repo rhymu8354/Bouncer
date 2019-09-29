@@ -146,6 +146,17 @@ namespace Bouncer.Wpf.View {
             Model.TimeOut(userTimeout.User, userTimeout.Period);
         }
 
+        private void OnMessagesSelectionChanged(object sender, SelectionChangedEventArgs e) {
+            if (Model.SelectedMessage.Userid == 0) {
+                return;
+            }
+            Model.User user;
+            if (Model.UsersById.TryGetValue(Model.SelectedMessage.Userid, out user)) {
+                Model.SelectedUser = user;
+                UsersList.ScrollIntoView(user);
+            }
+        }
+
         private void OnStopWatching(object sender, ExecutedRoutedEventArgs e) {
             var user = e.Parameter as Model.User;
             if (user == null) {
@@ -199,5 +210,6 @@ namespace Bouncer.Wpf.View {
         private SortAdorner UserListSortAdorner { get; set; }
 
         #endregion
+
     }
 }

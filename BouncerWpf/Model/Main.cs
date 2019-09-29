@@ -21,18 +21,19 @@ namespace Bouncer.Wpf.Model {
                 Main = main;
             }
 
-            public override void StatusMessage(uint level, string message) {
+            public override void StatusMessage(uint level, string message, long userid) {
                 Trace.WriteLine(
                     String.Format(
-                        "Status[{0}]: {1}",
+                        "Status[{0}/{1}]: {2}",
                         level,
+                        userid,
                         message
                     )
                 );
                 Main.Dispatcher.BeginInvoke(
                     DispatcherPriority.Normal,
                     (Action)(() => {
-                        Main.Messages.Add(Message.StatusMessage(level, message));
+                        Main.Messages.Add(Message.StatusMessage(level, message, userid));
                     })
                 );
             }
@@ -89,6 +90,8 @@ namespace Bouncer.Wpf.Model {
 
         public ObservableCollection<User> Users { get; private set; } = new ObservableCollection<User>();
 
+        public Dictionary<long, User> UsersById = new Dictionary<long, User>();
+
         public string ViewersReport {
             get {
                 if (Stats == null) {
@@ -118,8 +121,24 @@ namespace Bouncer.Wpf.Model {
                 } else {
                     Native.StopViewTimer();
                 }
+                NotifyPropertyChanged("ViewTimerRunning");
             }
         }
+
+        private Message selectedMessage_;
+        public Message SelectedMessage {
+            get {
+                return selectedMessage_;
+            }
+            set {
+                if (SelectedMessage == value) {
+                    return;
+                }
+                selectedMessage_ = value;
+                NotifyPropertyChanged("SelectedUser");
+            }
+        }
+
 
         private User selectedUser_;
         public User SelectedUser {
@@ -131,16 +150,7 @@ namespace Bouncer.Wpf.Model {
                     return;
                 }
                 selectedUser_ = value;
-                if (SelectedUser == null) {
-                    Trace.WriteLine("Deselected user");
-                } else {
-                    Trace.WriteLine(
-                        String.Format(
-                            "Selected user {0}",
-                            SelectedUser.Id
-                        )
-                    );
-                }
+                NotifyPropertyChanged("SelectedUser");
             }
         }
 
@@ -799,12 +809,15 @@ namespace Bouncer.Wpf.Model {
                     newUsersById.Remove(oldUser.Id);
                 } else {
                     Users.RemoveAt(i);
+                    UsersById.Remove(oldUser.Id);
                     --numOldUsers;
                 }
             }
             foreach (var user in newUsersById.Values) {
                 if (FilterUser(user)) {
-                    Users.Add(new User(user));
+                    var newUser = new User(user);
+                    Users.Add(newUser);
+                    UsersById.Add(newUser.Id, newUser);
                 }
             }
             nativeUsers.Dispose();

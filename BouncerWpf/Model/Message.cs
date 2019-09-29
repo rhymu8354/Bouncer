@@ -15,6 +15,7 @@ namespace Bouncer.Wpf.Model {
 
         public uint Level { get; set; }
         public string Content { get; set; }
+        public long Userid { get; set; }
 
         #endregion
 
@@ -22,11 +23,13 @@ namespace Bouncer.Wpf.Model {
 
         public static Message StatusMessage(
             uint level,
-            string content
+            string content,
+            long userid
         ) {
             var message = new Message();
             message.Level = level;
             message.Content = content;
+            message.Userid = userid;
             return message;
         }
 

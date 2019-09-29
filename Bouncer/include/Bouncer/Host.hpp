@@ -8,6 +8,7 @@
  * © 2019 by Richard Walters
  */
 
+#include <stdint.h>
 #include <string>
 
 namespace Bouncer {
@@ -20,7 +21,8 @@ namespace Bouncer {
     public:
         virtual void StatusMessage(
             size_t level,
-            const std::string& message
+            const std::string& message,
+            intmax_t userid
         ) = 0;
     };
 
