@@ -138,6 +138,14 @@ namespace Bouncer.Wpf.View {
             Model.StartWatching(user);
         }
 
+        private void OnTimeOut(object sender, ExecutedRoutedEventArgs e) {
+            var userTimeout = e.Parameter as Model.User.UserTimeout;
+            if (userTimeout == null) {
+                return;
+            }
+            Model.TimeOut(userTimeout.User, userTimeout.Period);
+        }
+
         private void OnStopWatching(object sender, ExecutedRoutedEventArgs e) {
             var user = e.Parameter as Model.User;
             if (user == null) {

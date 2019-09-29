@@ -68,6 +68,8 @@ namespace Bouncer {
 
         void StopWatching(intmax_t userid);
 
+        void TimeOut(intmax_t userid, int seconds);
+
         void Unban(intmax_t userid);
 
         void Unwhitelist(intmax_t userid);

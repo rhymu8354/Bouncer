@@ -1575,6 +1575,11 @@ namespace Bouncer {
             if (now - userSnapshot.createdAt < impl_->configuration.newAccountAgeThreshold) {
                 userSnapshot.isNewAccount = true;
             }
+            if (now > userSnapshot.timeout) {
+                userSnapshot.timeout = 0.0;
+            } else {
+                userSnapshot.timeout -= now;
+            }
             users.push_back(std::move(userSnapshot));
         }
         return users;
@@ -1685,6 +1690,38 @@ namespace Bouncer {
         usersByIdEntry->second.watching = false;
     }
 
+    void Main::TimeOut(intmax_t userid, int seconds) {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        auto usersByIdEntry = impl_->usersById.find(userid);
+        if (usersByIdEntry == impl_->usersById.end()) {
+            return;
+        }
+        if (impl_->state != Impl::State::InsideRoom) {
+            impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
+                SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                "Unable to time out user %" PRIdMAX " (%s) because we're not in the room",
+                usersByIdEntry->second.id,
+                usersByIdEntry->second.login.c_str()
+            );
+            return;
+        }
+        impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
+            3,
+            "Timing out user %" PRIdMAX " (%s) for %d seconds",
+            usersByIdEntry->second.id,
+            usersByIdEntry->second.login.c_str(),
+            seconds
+        );
+        impl_->tmi.SendMessage(
+            impl_->configuration.channel,
+            SystemAbstractions::sprintf(
+                "/timeout %s %d",
+                usersByIdEntry->second.login.c_str(),
+                seconds
+            )
+        );
+    }
+
     void Main::Unban(intmax_t userid) {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
         auto usersByIdEntry = impl_->usersById.find(userid);
@@ -1692,6 +1729,7 @@ namespace Bouncer {
             return;
         }
         usersByIdEntry->second.isBanned = false;
+        usersByIdEntry->second.timeout = 0.0;
         if (impl_->state != Impl::State::InsideRoom) {
             impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
                 SystemAbstractions::DiagnosticsSender::Levels::WARNING,

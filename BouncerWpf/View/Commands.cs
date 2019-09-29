@@ -18,6 +18,7 @@ namespace Bouncer.Wpf.View {
         public static RoutedUICommand MarkPossibleBot { get; private set; }
         public static RoutedUICommand StartWatching { get; private set; }
         public static RoutedUICommand StopWatching { get; private set; }
+        public static RoutedUICommand TimeOut { get; private set; }
         public static RoutedUICommand Unban { get; private set; }
         public static RoutedUICommand Unwhitelist { get; private set; }
         public static RoutedUICommand Whitelist { get; private set; }
@@ -38,6 +39,7 @@ namespace Bouncer.Wpf.View {
             MarkPossibleBot = new RoutedUICommand("Mark As a Possible Bot", "MarkPossibleBot", typeof(Commands));
             StartWatching = new RoutedUICommand("Start Watching", "StartWatching", typeof(Commands));
             StopWatching = new RoutedUICommand("Stop Watching", "StopWatching", typeof(Commands));
+            TimeOut = new RoutedUICommand("Time Out", "TimeOut", typeof(Commands));
             Unban = new RoutedUICommand("Unban", "Unban", typeof(Commands));
             Unwhitelist = new RoutedUICommand("Unwhitelist", "Unwhitelist", typeof(Commands));
             Whitelist = new RoutedUICommand("Whitelist", "Whitelist", typeof(Commands));

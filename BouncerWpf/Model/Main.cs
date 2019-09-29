@@ -627,6 +627,10 @@ namespace Bouncer.Wpf.Model {
             Native.StopWatching(user.Id);
         }
 
+        public void TimeOut(User user, int seconds) {
+            Native.TimeOut(user.Id, seconds);
+        }
+
         public void Unban(User user) {
             Native.Unban(user.Id);
         }

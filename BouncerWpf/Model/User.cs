@@ -11,12 +11,23 @@ using System.Windows.Media;
 
 namespace Bouncer.Wpf.Model {
     public class User: INotifyPropertyChanged {
+        #region Types
+
+        public class UserTimeout {
+            public User User { get; set; }
+            public int Period { get; set; }
+        }
+
+        #endregion
+
         #region Public Properties
 
         public Brush Foreground {
             get {
                 if (IsBanned) {
                     return Brushes.Red;
+                } else if (Timeout > 0.0) {
+                    return Brushes.OrangeRed;
                 } else if (Watching) {
                     return Brushes.Blue;
                 } else if (IsNewAccount) {
@@ -190,6 +201,99 @@ namespace Bouncer.Wpf.Model {
         }
 
         public double Timeout { get; private set; }
+
+        public UserTimeout Timeout1s {
+            get {
+                var timeout = new UserTimeout {
+                    User = this,
+                    Period = 1
+                };
+                return timeout;
+            }
+        }
+
+        public UserTimeout Timeout10m {
+            get {
+                var timeout = new UserTimeout {
+                    User = this,
+                    Period = 600
+                };
+                return timeout;
+            }
+        }
+
+        public UserTimeout Timeout1h {
+            get {
+                var timeout = new UserTimeout {
+                    User = this,
+                    Period = 3600
+                };
+                return timeout;
+            }
+        }
+
+        public UserTimeout Timeout6h {
+            get {
+                var timeout = new UserTimeout {
+                    User = this,
+                    Period = 21600
+                };
+                return timeout;
+            }
+        }
+
+        public UserTimeout Timeout1d {
+            get {
+                var timeout = new UserTimeout {
+                    User = this,
+                    Period = 86400
+                };
+                return timeout;
+            }
+        }
+
+        public string TimeOutMenuItemHeader {
+            get {
+                return String.Format("Time out {0}", Name);
+            }
+        }
+
+        public string TimeOut1sMenuItemHeader {
+            get {
+                return String.Format("Time out {0} for 1 second", Name);
+            }
+        }
+
+        public string TimeOut10mMenuItemHeader {
+            get {
+                return String.Format("Time out {0} for 10 minutes", Name);
+            }
+        }
+
+        public string TimeOut1hMenuItemHeader {
+            get {
+                return String.Format("Time out {0} for 1 hour", Name);
+            }
+        }
+
+        public string TimeOut6hMenuItemHeader {
+            get {
+                return String.Format("Time out {0} for 6 hours", Name);
+            }
+        }
+
+        public string TimeOut1dMenuItemHeader {
+            get {
+                return String.Format("Time out {0} for 1 day", Name);
+            }
+        }
+
+        public Visibility TimeOutMenuItemVisibility {
+            get {
+                return IsBanned ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
         public double TotalViewTime { get; private set; }
 
         public string TotalViewTimeFormatted {
@@ -200,7 +304,7 @@ namespace Bouncer.Wpf.Model {
 
         public string TimeoutFormatted {
             get {
-                return Utilities.FormatAbsoluteTime(Timeout);
+                return Utilities.FormatDeltaTime(Timeout);
             }
         }
 
@@ -212,7 +316,14 @@ namespace Bouncer.Wpf.Model {
 
         public Visibility UnbanMenuItemVisibility {
             get {
-                return IsBanned ? Visibility.Visible : Visibility.Collapsed;
+                return (
+                    (
+                        IsBanned
+                        || (Timeout > 0.0)
+                    )
+                    ? Visibility.Visible
+                    : Visibility.Collapsed
+                );
             }
         }
 
@@ -394,6 +505,7 @@ namespace Bouncer.Wpf.Model {
                 Timeout = native.timeout;
                 NotifyPropertyChanged("Timeout");
                 NotifyPropertyChanged("TimeoutFormatted");
+                NotifyPropertyChanged("Foreground");
             }
         }
 
