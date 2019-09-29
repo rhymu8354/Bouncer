@@ -19,6 +19,9 @@
             <RowDefinition Height="auto" />
             <RowDefinition Height="auto" />
             <RowDefinition Height="auto" />
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="auto" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="auto" />
@@ -32,13 +35,19 @@
         <TextBox Text="{Binding ClientId}" Grid.Row="2" Grid.Column="1" Width="500" VerticalAlignment="Center" />
         <Label Grid.Row="3" Grid.Column="0" HorizontalAlignment="Right" Content="Channel:" />
         <TextBox Text="{Binding Channel}" Grid.Row="3" Grid.Column="1" Width="500" VerticalAlignment="Center" />
-        <Label Grid.Row="4" Grid.Column="0" HorizontalAlignment="Right" Content="New account auto-timeout age threshold:" />
-        <TextBox Text="{Binding NewAccountAgeThreshold}" Grid.Row="4" Grid.Column="1" Width="500" VerticalAlignment="Center" />
-        <Label Grid.Row="5" Grid.Column="0" HorizontalAlignment="Right" Content="Recent chat time threshold:" />
-        <TextBox Text="{Binding RecentChatThreshold}" Grid.Row="5" Grid.Column="1" Width="500" VerticalAlignment="Center" />
-        <Label Grid.Row="6" Grid.Column="0" HorizontalAlignment="Right" Content="Minimum diagnostics threshold:" />
-        <TextBox Text="{Binding MinDiagnosticsThreshold}" Grid.Row="6" Grid.Column="1" Width="500" VerticalAlignment="Center" />
-        <Grid Grid.Row="7" Grid.ColumnSpan="2" Margin="20,10">
+        <Label Grid.Row="4" Grid.Column="0" HorizontalAlignment="Right" Content="Greeting Pattern:" />
+        <TextBox Text="{Binding GreetingPattern}" Grid.Row="4" Grid.Column="1" Width="500" VerticalAlignment="Center" />
+        <Label Grid.Row="5" Grid.Column="0" HorizontalAlignment="Right" Content="New account auto-timeout age threshold:" />
+        <TextBox Text="{Binding NewAccountAgeThreshold}" Grid.Row="5" Grid.Column="1" Width="500" VerticalAlignment="Center" />
+        <Label Grid.Row="6" Grid.Column="0" HorizontalAlignment="Right" Content="Recent chat time threshold:" />
+        <TextBox Text="{Binding RecentChatThreshold}" Grid.Row="6" Grid.Column="1" Width="500" VerticalAlignment="Center" />
+        <Label Grid.Row="7" Grid.Column="0" HorizontalAlignment="Right" Content="Minimum diagnostics threshold:" />
+        <TextBox Text="{Binding MinDiagnosticsThreshold}" Grid.Row="7" Grid.Column="1" Width="500" VerticalAlignment="Center" />
+        <Label Grid.Row="8" Grid.Column="0" HorizontalAlignment="Right" Content="Auto-timeout new account chatters" />
+        <CheckBox Grid.Row="8" Grid.Column="1" IsChecked="{Binding AutoTimeOutNewAccountChatters}" VerticalAlignment="Center" />
+        <Label Grid.Row="9" Grid.Column="0" HorizontalAlignment="Right" Content="Auto-ban title scammers" />
+        <CheckBox Grid.Row="9" Grid.Column="1" IsChecked="{Binding AutoBanTitleScammers}" VerticalAlignment="Center" />
+        <Grid Grid.Row="10" Grid.ColumnSpan="2" Margin="20,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="auto" />
                 <ColumnDefinition Width="*" />

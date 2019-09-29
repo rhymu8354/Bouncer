@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Bouncer.Wpf.Model {
     public class User: INotifyPropertyChanged {
@@ -152,6 +153,15 @@ namespace Bouncer.Wpf.Model {
         }
 
         public string Name { get; private set; }
+
+        public bool NeedsGreeting { get; private set; }
+
+        public BitmapImage NeedsGreetingImage {
+            get {
+                return NeedsGreeting ? GreetImage : null;
+            }
+        }
+
         public uint NumMessages { get; private set; }
         public uint NumMessagesThisInstance { get; private set; }
         public string Note { get; private set; }
@@ -379,6 +389,7 @@ namespace Bouncer.Wpf.Model {
             CreatedAt = native.createdAt;
             FirstMessageTime = native.firstMessageTime;
             FirstMessageTimeThisInstance = native.firstMessageTimeThisInstance;
+            NeedsGreeting = native.needsGreeting;
             Id = native.id;
             IsBanned = native.isBanned;
             IsJoined = native.isJoined;
@@ -424,6 +435,11 @@ namespace Bouncer.Wpf.Model {
                 FirstMessageTimeThisInstance = native.firstMessageTimeThisInstance;
                 NotifyPropertyChanged("FirstMessageTimeThisInstance");
                 NotifyPropertyChanged("FirstMessageTimeReport");
+            }
+            if (NeedsGreeting != native.needsGreeting) {
+                NeedsGreeting = native.needsGreeting;
+                NotifyPropertyChanged("NeedsGreeting");
+                NotifyPropertyChanged("NeedsGreetingImage");
             }
             if (Id != native.id) {
                 Id = native.id;
@@ -538,6 +554,14 @@ namespace Bouncer.Wpf.Model {
         private void NotifyPropertyChanged(string propertyName) {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+
+        #endregion
+
+        #region Private Properties
+
+        private static readonly BitmapImage GreetImage = new BitmapImage(
+            new Uri("pack://application:,,/View/rhymu8hey.png")
+        );
 
         #endregion
     }

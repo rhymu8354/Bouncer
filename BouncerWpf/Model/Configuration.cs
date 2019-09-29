@@ -38,6 +38,26 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public bool AutoBanTitleScammers {
+            get {
+                return Adaptee.autoBanTitleScammers;
+            }
+            set {
+                Adaptee.autoBanTitleScammers = value;
+                NotifyPropertyChanged("AutoBanTitleScammers");
+            }
+        }
+
+        public bool AutoTimeOutNewAccountChatters {
+            get {
+                return Adaptee.autoTimeOutNewAccountChatters;
+            }
+            set {
+                Adaptee.autoTimeOutNewAccountChatters = value;
+                NotifyPropertyChanged("AutoTimeOutNewAccountChatters");
+            }
+        }
+
         public string Token {
             get {
                 return Adaptee.token;
@@ -65,6 +85,16 @@ namespace Bouncer.Wpf.Model {
             set {
                 Adaptee.channel = value;
                 NotifyPropertyChanged("Channel");
+            }
+        }
+
+        public string GreetingPattern {
+            get {
+                return Adaptee.greetingPattern;
+            }
+            set {
+                Adaptee.greetingPattern = value;
+                NotifyPropertyChanged("GreetingPattern");
             }
         }
 

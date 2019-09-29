@@ -21,9 +21,12 @@ namespace Bouncer {
         std::string token;
         std::string clientId;
         std::string channel;
+        std::string greetingPattern;
         double newAccountAgeThreshold = 604800.0;
         double recentChatThreshold = 1800.0;
         size_t minDiagnosticsLevel = 0;
+        bool autoTimeOutNewAccountChatters = false;
+        bool autoBanTitleScammers = false;
     };
 
 }

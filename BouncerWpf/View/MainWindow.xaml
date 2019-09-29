@@ -187,6 +187,16 @@
             </ListView.ItemContainerStyle>
             <ListView.View>
                 <GridView>
+                    <GridViewColumn Width="28">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="OnSortUsers" Tag="NeedsGreeting">Hi</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <Image Source="{Binding NeedsGreetingImage}" Height="16" />
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
                     <GridViewColumn DisplayMemberBinding="{Binding Id}">
                         <GridViewColumn.Header>
                             <GridViewColumnHeader Click="OnSortUsers" Tag="Id">ID</GridViewColumnHeader>

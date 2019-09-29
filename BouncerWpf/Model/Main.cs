@@ -804,6 +804,7 @@ namespace Bouncer.Wpf.Model {
                         ++i;
                     } else {
                         Users.RemoveAt(i);
+                        UsersById.Remove(oldUser.Id);
                         --numOldUsers;
                     }
                     newUsersById.Remove(oldUser.Id);

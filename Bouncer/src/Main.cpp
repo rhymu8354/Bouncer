@@ -546,9 +546,12 @@ namespace Bouncer {
             configuration.token = (std::string)json["token"];
             configuration.clientId = (std::string)json["clientId"];
             configuration.channel = (std::string)json["channel"];
+            configuration.greetingPattern = (std::string)json["greetingPattern"];
             configuration.newAccountAgeThreshold = (double)json["newAccountAgeThreshold"];
             configuration.recentChatThreshold = (double)json["recentChatThreshold"];
             configuration.minDiagnosticsLevel = (size_t)json["minDiagnosticsLevel"];
+            configuration.autoTimeOutNewAccountChatters = (bool)json["autoTimeOutNewAccountChatters"];
+            configuration.autoBanTitleScammers = (bool)json["autoBanTitleScammers"];
             stats.maxViewerCount = (size_t)json["maxViewerCount"];
             stats.totalViewTimeRecorded = (double)json["totalViewTimeRecorded"];
             const auto& users = json["users"];
@@ -744,6 +747,7 @@ namespace Bouncer {
                         }
                         user.login = messageInfo.user;
                     }
+                    userIdsByLogin[messageInfo.user] = userid;
                     if (user.name != messageInfo.tags.displayName) {
                         if (!user.name.empty()) {
                             diagnosticsSender.SendDiagnosticInformationFormatted(
@@ -757,6 +761,13 @@ namespace Bouncer {
                         user.name = messageInfo.tags.displayName;
                     }
                     user.lastMessageTime = messageTime;
+                    if (
+                        (user.numMessagesThisInstance == 0)
+                        && (user.bot != User::Bot::Yes)
+                        && (user.login != configuration.channel)
+                    ) {
+                        user.needsGreeting = true;
+                    }
                     ++user.numMessages;
                     ++user.numMessagesThisInstance;
                     UserSeen(user, messageTime);
@@ -790,6 +801,35 @@ namespace Bouncer {
                                 ),
                                 userid
                             );
+                        }
+                    }
+                    if (
+                        (user.role == User::Role::Broadcaster)
+                        && !configuration.greetingPattern.empty()
+                    ) {
+                        const auto greetingPatternLength = configuration.greetingPattern.length();
+                        if (
+                            messageInfo.messageContent.substr(0, greetingPatternLength)
+                            == configuration.greetingPattern
+                        ) {
+                            const auto target = SystemAbstractions::Trim(
+                                messageInfo.messageContent.substr(greetingPatternLength)
+                            );
+                            const auto userIdsByLoginEntry = userIdsByLogin.find(target);
+                            if (userIdsByLoginEntry != userIdsByLogin.end()) {
+                                const auto userid = userIdsByLoginEntry->second;
+                                auto usersByIdEntry = usersById.find(userid);
+                                if (usersByIdEntry != usersById.end()) {
+                                    auto& user = usersByIdEntry->second;
+                                    diagnosticsSender.SendDiagnosticInformationFormatted(
+                                        2,
+                                        "Broadcaster greeted user %" PRIdMAX " (%s)",
+                                        userid,
+                                        user.login.c_str()
+                                    );
+                                    user.needsGreeting = false;
+                                }
+                            }
                         }
                     }
                 }
@@ -923,10 +963,6 @@ namespace Bouncer {
                 PostStatus("Joined room");
                 state = State::InsideRoom;
                 stats.currentViewerCount = 0;
-                //tmi.SendMessage(
-                //    configuration.channel,
-                //    "Hello, World!"
-                //);
             } else {
                 UsersJoined({std::move(membershipInfo.user)});
             }
@@ -1175,9 +1211,12 @@ namespace Bouncer {
                 {"token", configuration.token},
                 {"clientId", configuration.clientId},
                 {"channel", configuration.channel},
+                {"greetingPattern", configuration.greetingPattern},
                 {"newAccountAgeThreshold", configuration.newAccountAgeThreshold},
                 {"recentChatThreshold", configuration.recentChatThreshold},
                 {"minDiagnosticsLevel", configuration.minDiagnosticsLevel},
+                {"autoTimeOutNewAccountChatters", configuration.autoTimeOutNewAccountChatters},
+                {"autoBanTitleScammers", configuration.autoBanTitleScammers},
                 {"users", Json::Array({})},
                 {"maxViewerCount", stats.maxViewerCount},
                 {"totalViewTimeRecorded", totalViewTimeRecorded},
