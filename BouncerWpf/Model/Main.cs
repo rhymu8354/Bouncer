@@ -34,6 +34,7 @@ namespace Bouncer.Wpf.Model {
                     DispatcherPriority.Normal,
                     (Action)(() => {
                         Main.Messages.Add(Message.StatusMessage(level, message, userid));
+                        Main.DiscardOldMessages();
                     })
                 );
             }
@@ -54,76 +55,22 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
-        public ObservableCollection<Message> Messages { get; private set; } = new ObservableCollection<Message>();
-
-        public Bouncer.Stats stats_;
-        public Bouncer.Stats Stats {
+        private int maxMessages_ = 1000;
+        public int MaxMessages {
             get {
-                return stats_;
-            }
-            private set {
-                if (Stats == value) {
-                    return;
-                }
-                if (Stats != null) {
-                    Stats.Dispose();
-                }
-                stats_ = value;
-                NotifyPropertyChanged("Stats");
-                NotifyPropertyChanged("TimeReport");
-                NotifyPropertyChanged("ViewersReport");
-            }
-        }
-
-        public string TimeReport {
-            get {
-                if (Stats == null) {
-                    return "";
-                }
-                return String.Format(
-                    "{0} / {1}",
-                    Utilities.FormatDeltaTime(Stats.totalViewTimeRecordedThisInstance),
-                    Utilities.FormatDeltaTime(Stats.totalViewTimeRecorded)
-                );
-            }
-        }
-
-        public ObservableCollection<User> Users { get; private set; } = new ObservableCollection<User>();
-
-        public Dictionary<long, User> UsersById = new Dictionary<long, User>();
-
-        public string ViewersReport {
-            get {
-                if (Stats == null) {
-                    return "";
-                }
-                return String.Format(
-                    "{0} / {1} / {2}",
-                    Stats.currentViewerCount,
-                    Stats.maxViewerCountThisInstance,
-                    Stats.maxViewerCount
-                );
-            }
-        }
-
-        private bool viewTimerRunning_ = false;
-        public bool ViewTimerRunning {
-            get {
-                return viewTimerRunning_;
+                return maxMessages_;
             }
             set {
-                if (ViewTimerRunning == value) {
+                if (MaxMessages == value) {
                     return;
                 }
-                viewTimerRunning_ = value;
-                if (ViewTimerRunning) {
-                    Native.StartViewTimer();
-                } else {
-                    Native.StopViewTimer();
-                }
-                NotifyPropertyChanged("ViewTimerRunning");
+                maxMessages_ = value;
+                NotifyPropertyChanged("MaxMessages");
+                DiscardOldMessages();
             }
         }
+
+        public ObservableCollection<Message> Messages { get; private set; } = new ObservableCollection<Message>();
 
         private Message selectedMessage_;
         public Message SelectedMessage {
@@ -597,6 +544,75 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public Bouncer.Stats stats_;
+        public Bouncer.Stats Stats {
+            get {
+                return stats_;
+            }
+            private set {
+                if (Stats == value) {
+                    return;
+                }
+                if (Stats != null) {
+                    Stats.Dispose();
+                }
+                stats_ = value;
+                NotifyPropertyChanged("Stats");
+                NotifyPropertyChanged("TimeReport");
+                NotifyPropertyChanged("ViewersReport");
+            }
+        }
+
+        public string TimeReport {
+            get {
+                if (Stats == null) {
+                    return "";
+                }
+                return String.Format(
+                    "{0} / {1}",
+                    Utilities.FormatDeltaTime(Stats.totalViewTimeRecordedThisInstance),
+                    Utilities.FormatDeltaTime(Stats.totalViewTimeRecorded)
+                );
+            }
+        }
+
+        public ObservableCollection<User> Users { get; private set; } = new ObservableCollection<User>();
+
+        public Dictionary<long, User> UsersById = new Dictionary<long, User>();
+
+        public string ViewersReport {
+            get {
+                if (Stats == null) {
+                    return "";
+                }
+                return String.Format(
+                    "{0} / {1} / {2}",
+                    Stats.currentViewerCount,
+                    Stats.maxViewerCountThisInstance,
+                    Stats.maxViewerCount
+                );
+            }
+        }
+
+        private bool viewTimerRunning_ = false;
+        public bool ViewTimerRunning {
+            get {
+                return viewTimerRunning_;
+            }
+            set {
+                if (ViewTimerRunning == value) {
+                    return;
+                }
+                viewTimerRunning_ = value;
+                if (ViewTimerRunning) {
+                    Native.StartViewTimer();
+                } else {
+                    Native.StopViewTimer();
+                }
+                NotifyPropertyChanged("ViewTimerRunning");
+            }
+        }
+
         #endregion
 
         #region Public Methods
@@ -686,6 +702,12 @@ namespace Bouncer.Wpf.Model {
         #endregion
 
         #region Private Methods
+
+        private void DiscardOldMessages() {
+            while (Messages.Count > MaxMessages) {
+                Messages.RemoveAt(0);
+            }
+        }
 
         private bool FilterUser(Bouncer.User user) {
             bool show = false;
