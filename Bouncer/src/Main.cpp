@@ -1895,7 +1895,21 @@ namespace Bouncer {
         if (usersByIdEntry == impl_->usersById.end()) {
             return;
         }
-        usersByIdEntry->second.bot = bot;
+        auto& user = usersByIdEntry->second;
+        if (user.isJoined) {
+            if (
+                (user.bot == User::Bot::Yes)
+                && (bot != User::Bot::Yes)
+            ) {
+                impl_->ViewerCountUp();
+            } else if (
+                (user.bot != User::Bot::Yes)
+                && (bot == User::Bot::Yes)
+            ) {
+                impl_->ViewerCountDown();
+            }
+        }
+        user.bot = bot;
     }
 
     void Main::SetConfiguration(const Configuration& configuration) {
