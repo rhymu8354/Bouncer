@@ -1918,6 +1918,16 @@ namespace Bouncer {
         return users;
     }
 
+    void Main::MarkGreeted(intmax_t userid) {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        auto usersByIdEntry = impl_->usersById.find(userid);
+        if (usersByIdEntry == impl_->usersById.end()) {
+            return;
+        }
+        auto& user = usersByIdEntry->second;
+        user.needsGreeting = false;
+    }
+
     void Main::SetBotStatus(intmax_t userid, User::Bot bot) {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
         auto usersByIdEntry = impl_->usersById.find(userid);

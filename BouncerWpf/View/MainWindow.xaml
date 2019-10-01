@@ -12,6 +12,7 @@
         <CommandBinding Command="local:Commands.Exit" Executed="OnExit" />
         <CommandBinding Command="local:Commands.Ban" Executed="OnBan" />
         <CommandBinding Command="local:Commands.MarkBot" Executed="OnMarkBot" />
+        <CommandBinding Command="local:Commands.MarkGreeted" Executed="OnMarkGreeted" />
         <CommandBinding Command="local:Commands.MarkNotBot" Executed="OnMarkNotBot" />
         <CommandBinding Command="local:Commands.MarkPossibleBot" Executed="OnMarkPossibleBot" />
         <CommandBinding Command="local:Commands.StartWatching" Executed="OnStartWatching" />
@@ -171,6 +172,14 @@
                         <MenuItem.Style>
                             <Style TargetType="{x:Type MenuItem}">
                                 <Setter Property="Visibility" Value="{Binding MarkPossibleBotMenuItemVisibility}" />
+                            </Style>
+                        </MenuItem.Style>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem Header="{Binding MarkGreetedMenuItemHeader}" Command="local:Commands.MarkGreeted" CommandParameter="{Binding}">
+                        <MenuItem.Style>
+                            <Style TargetType="{x:Type MenuItem}">
+                                <Setter Property="Visibility" Value="{Binding MarkGreetedMenuItemVisibility}" />
                             </Style>
                         </MenuItem.Style>
                     </MenuItem>

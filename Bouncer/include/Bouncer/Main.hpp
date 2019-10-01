@@ -46,6 +46,8 @@ namespace Bouncer {
 
         std::vector< User > GetUsers();
 
+        void MarkGreeted(intmax_t userid);
+
         void SetBotStatus(intmax_t userid, User::Bot bot);
 
         void SetConfiguration(const Configuration& configuration);

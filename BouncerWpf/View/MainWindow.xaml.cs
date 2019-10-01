@@ -101,6 +101,14 @@ namespace Bouncer.Wpf.View {
             Model.SetBotStatus(user, User.Bot.Yes);
         }
 
+        private void OnMarkGreeted(object sender, ExecutedRoutedEventArgs e) {
+            var user = e.Parameter as Model.User;
+            if (user == null) {
+                return;
+            }
+            Model.MarkGreeted(user);
+        }
+
         private void OnMarkNotBot(object sender, ExecutedRoutedEventArgs e) {
             var user = e.Parameter as Model.User;
             if (user == null) {

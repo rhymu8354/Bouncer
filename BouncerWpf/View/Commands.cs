@@ -13,6 +13,7 @@ namespace Bouncer.Wpf.View {
         public static RoutedUICommand Configure { get; private set; }
         public static RoutedUICommand Exit { get; private set; }
         public static RoutedUICommand MarkBot { get; private set; }
+        public static RoutedUICommand MarkGreeted { get; private set; }
         public static RoutedUICommand MarkNotBot { get; private set; }
         public static RoutedUICommand MarkPossibleBot { get; private set; }
         public static RoutedUICommand StartWatching { get; private set; }
@@ -33,6 +34,7 @@ namespace Bouncer.Wpf.View {
             exitGestures.Add(new KeyGesture(Key.F4, ModifierKeys.Alt));
             Exit = new RoutedUICommand("E_xit", "Exit", typeof(Commands), exitGestures);
             MarkBot = new RoutedUICommand("Mark As Bot", "MarkBot", typeof(Commands));
+            MarkGreeted = new RoutedUICommand("Mark Greeted", "MarkGreeted", typeof(Commands));
             MarkNotBot = new RoutedUICommand("Mark As Not a Bot", "MarkNotBot", typeof(Commands));
             MarkPossibleBot = new RoutedUICommand("Mark As a Possible Bot", "MarkPossibleBot", typeof(Commands));
             StartWatching = new RoutedUICommand("Start Watching", "StartWatching", typeof(Commands));

@@ -637,6 +637,10 @@ namespace Bouncer.Wpf.Model {
             Native.Ban(user.Id);
         }
 
+        public void MarkGreeted(User user) {
+            Native.MarkGreeted(user.Id);
+        }
+
         public void SetBotStatus(User user, Bouncer.User.Bot bot) {
             Native.SetBotStatus(user.Id, bot);
         }

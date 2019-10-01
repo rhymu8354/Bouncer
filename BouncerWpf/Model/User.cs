@@ -143,6 +143,18 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public string MarkGreetedMenuItemHeader {
+            get {
+                return "Mark Greeted";
+            }
+        }
+
+        public Visibility MarkGreetedMenuItemVisibility {
+            get {
+                return NeedsGreeting ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
         public string MarkPossibleBotMenuItemHeader {
             get {
                 return "Possibly a bot";
