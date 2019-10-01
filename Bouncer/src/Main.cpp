@@ -1030,7 +1030,7 @@ namespace Bouncer {
                     } else {
                         impl.diagnosticsSender.SendDiagnosticInformationFormatted(
                             SystemAbstractions::DiagnosticsSender::Levels::WARNING,
-                            "Twitch API call %d returned code %d",
+                            "Twitch API call %d returned code %u",
                             id,
                             transaction.response.statusCode
                         );
@@ -1323,7 +1323,7 @@ namespace Bouncer {
                     } else {
                         impl.diagnosticsSender.SendDiagnosticInformationFormatted(
                             SystemAbstractions::DiagnosticsSender::Levels::WARNING,
-                            "Twitch API call %d returned code %d",
+                            "Twitch API call %d returned code %u",
                             id,
                             transaction.response.statusCode
                         );
@@ -1535,7 +1535,7 @@ namespace Bouncer {
                     } else {
                         impl.diagnosticsSender.SendDiagnosticInformationFormatted(
                             SystemAbstractions::DiagnosticsSender::Levels::WARNING,
-                            "Twitch API call %d returned code %d",
+                            "Twitch API call %d returned code %u",
                             id,
                             transaction.response.statusCode
                         );
