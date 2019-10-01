@@ -1,6 +1,7 @@
 using Bouncer.Wpf.Properties;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
@@ -105,6 +106,8 @@ namespace Bouncer.Wpf.Model {
                 return Utilities.FormatAbsoluteTime(JoinTime);
             }
         }
+
+        public ObservableCollection<string> LastChat { get; private set; } = new ObservableCollection<string>();
 
         public double LastMessageTime { get; private set; }
 
@@ -379,6 +382,11 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public string WindowTitle {
+            get {
+                return String.Format("Bouncer - User: {0}", Name);
+            }
+        }
 
         #endregion
 
@@ -408,6 +416,9 @@ namespace Bouncer.Wpf.Model {
             NumMessagesThisInstance = native.numMessagesThisInstance;
             Role = native.role;
             Timeout = native.timeout;
+            for (int i = 0; i < native.lastChat.Count; ++i) {
+                LastChat.Add(native.lastChat[i]);
+            }
         }
 
         public void Update(Bouncer.User native) {
@@ -496,6 +507,7 @@ namespace Bouncer.Wpf.Model {
             if (Name != native.name) {
                 Name = native.name;
                 NotifyPropertyChanged("Name");
+                NotifyPropertyChanged("WindowTitle");
                 NotifyPropertyChanged("BanMenuItemHeader");
                 NotifyPropertyChanged("UnbanMenuItemHeader");
                 NotifyPropertyChanged("StartWatchingMenuItemHeader");
@@ -538,6 +550,30 @@ namespace Bouncer.Wpf.Model {
                 NotifyPropertyChanged("Timeout");
                 NotifyPropertyChanged("TimeoutFormatted");
                 NotifyPropertyChanged("Foreground");
+            }
+            while (
+                (LastChat.Count > 0)
+                && (
+                    (native.lastChat.Count == 0)
+                    || (LastChat[0] != native.lastChat[0])
+                )
+            ) {
+                LastChat.RemoveAt(0);
+            }
+            int i = 0;
+            while (
+                (i < native.lastChat.Count)
+                && (i < LastChat.Count)
+                && (LastChat[i] == native.lastChat[i])
+            ) {
+                ++i;
+            }
+            while (i < LastChat.Count) {
+                LastChat.RemoveAt(i);
+            }
+            while (i < native.lastChat.Count) {
+                LastChat.Add(native.lastChat[i]);
+                ++i;
             }
         }
 

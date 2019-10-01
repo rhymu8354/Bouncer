@@ -11,7 +11,6 @@
         <CommandBinding Command="local:Commands.Configure" Executed="OnConfigure" />
         <CommandBinding Command="local:Commands.Exit" Executed="OnExit" />
         <CommandBinding Command="local:Commands.Ban" Executed="OnBan" />
-        <CommandBinding Command="local:Commands.EditNote" Executed="OnEditNote" />
         <CommandBinding Command="local:Commands.MarkBot" Executed="OnMarkBot" />
         <CommandBinding Command="local:Commands.MarkNotBot" Executed="OnMarkNotBot" />
         <CommandBinding Command="local:Commands.MarkPossibleBot" Executed="OnMarkPossibleBot" />
@@ -175,14 +174,13 @@
                             </Style>
                         </MenuItem.Style>
                     </MenuItem>
-                    <Separator />
-                    <MenuItem Header="{Binding EditNoteMenuItemHeader}" Command="local:Commands.EditNote" CommandParameter="{Binding}" />
                 </ContextMenu>
             </ListView.Resources>
             <ListView.ItemContainerStyle>
                 <Style TargetType="{x:Type ListViewItem}">
                     <Setter Property="ContextMenu" Value="{StaticResource ItemContextMenu}" />
                     <Setter Property="Foreground" Value="{Binding Foreground}" />
+                    <EventSetter Event="MouseDoubleClick" Handler="OnUserDoubleClick" />
                 </Style>
             </ListView.ItemContainerStyle>
             <ListView.View>

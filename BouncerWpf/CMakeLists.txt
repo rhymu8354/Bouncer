@@ -32,14 +32,14 @@ if(MSVC)
         View/Commands.cs
         View/ConfigurationWindow.xaml
         View/ConfigurationWindow.xaml.cs
-        View/EditNoteWindow.xaml
-        View/EditNoteWindow.xaml.cs
         View/FindDescendant.cs
         View/ListBoxExtensions.cs
         View/MainWindow.xaml
         View/MainWindow.xaml.cs
         View/rhymu8hey.png
         View/SortAdorner.cs
+        View/UserWindow.xaml
+        View/UserWindow.xaml.cs
     )
     set_source_files_properties(App.xaml PROPERTIES
         VS_XAML_TYPE ApplicationDefinition

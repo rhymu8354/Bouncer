@@ -42,11 +42,12 @@
 namespace {
 
     constexpr double configurationAutoSaveCooldown = 60.0;
-    constexpr double streamCheckCooldown = 600.0;
     const auto configurationFilePath = SystemAbstractions::File::GetExeParentDirectory() + "/Bouncer.json";
-    constexpr size_t maxTwitchUserLookupsByLogin = 100;
-    constexpr double twitchApiLookupCooldown = 1.0;
+    constexpr size_t maxUserChatLines = 10;
     constexpr int maxTimeoutSeconds = 1209600;
+    constexpr size_t maxTwitchUserLookupsByLogin = 100;
+    constexpr double streamCheckCooldown = 60.0;
+    constexpr double twitchApiLookupCooldown = 1.0;
 
     std::string InstantiateTemplate(
         const std::string& templateText,
@@ -548,6 +549,13 @@ namespace Bouncer {
             WithoutLock(lock, [&]{ PublishMessages(); });
         }
 
+        std::string FormatDateTime(double time) {
+            char buffer[20];
+            auto timeSeconds = (time_t)time;
+            (void)strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", gmtime(&timeSeconds));
+            return buffer;
+        }
+
         std::string FormatTime(double time) {
             char buffer[9];
             auto timeSeconds = (time_t)time;
@@ -670,6 +678,11 @@ namespace Bouncer {
                     } else if (role == "pleb") {
                         user.role = User::Role::Pleb;
                     }
+                }
+                const auto& lastChat = userEncoded["lastChat"];
+                const auto numLastChatLines = lastChat.GetSize();
+                for (size_t j = 0; j < numLastChatLines; ++j) {
+                    user.lastChat.push_back((std::string)lastChat[j]);
                 }
                 userIdsByLogin[user.login] = userid;
             }
@@ -843,6 +856,17 @@ namespace Bouncer {
                         user.firstMessageTimeThisInstance = messageTime;
                     }
                     UpdateRole(user, messageInfo.tags.badges);
+                    user.lastChat.push_back(
+                        SystemAbstractions::sprintf(
+                            "%06zu - %s - %s",
+                            user.numMessages,
+                            FormatDateTime(messageTime).c_str(),
+                            messageInfo.messageContent.c_str()
+                        )
+                    );
+                    while (user.lastChat.size() > maxUserChatLines) {
+                        user.lastChat.erase(user.lastChat.begin());
+                    }
                     if (configuration.minDiagnosticsLevel <= 3) {
                         if (messageInfo.isAction) {
                             QueueStatus(
@@ -1393,6 +1417,7 @@ namespace Bouncer {
                     {"isWhitelisted", user.isWhitelisted},
                     {"watching", user.watching},
                     {"note", user.note},
+                    {"lastChat", Json::Array({})},
                 });
                 switch (user.bot) {
                     case User::Bot::Yes: {
@@ -1431,6 +1456,10 @@ namespace Bouncer {
                     } break;
 
                     default: break;
+                }
+                auto& lastChat = userEncoded["lastChat"];
+                for (const auto& line: user.lastChat) {
+                    lastChat.Add(line);
                 }
                 users.Add(std::move(userEncoded));
             }

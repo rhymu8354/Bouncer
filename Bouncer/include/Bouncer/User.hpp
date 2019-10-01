@@ -8,8 +8,10 @@
  * © 2019 by Richard Walters
  */
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <string>
+#include <vector>
 
 namespace Bouncer {
 
@@ -54,6 +56,7 @@ namespace Bouncer {
             Admin,
             Staff,
         } role = Role::Unknown;
+        std::vector< std::string > lastChat;
     };
 
 }

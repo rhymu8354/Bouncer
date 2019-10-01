@@ -19,19 +19,29 @@ using System.Windows.Threading;
 
 namespace Bouncer.Wpf.View {
     /// <summary>
-    /// Interaction logic for EditNoteWindow.xaml
+    /// Interaction logic for UserWindow.xaml
     /// </summary>
-    public partial class EditNoteWindow: Window {
+    public partial class UserWindow: Window {
         #region Public Properties
 
-        private Model.UserNote model_;
-        public Model.UserNote Model {
+        private Model.Main main_;
+        public Model.Main Main {
             get {
-                return model_;
+                return main_;
             }
             set {
-                model_ = value;
-                DataContext = Model;
+                main_ = value;
+            }
+        }
+
+        private Model.User user_;
+        public Model.User User {
+            get {
+                return user_;
+            }
+            set {
+                user_ = value;
+                DataContext = User;
             }
         }
 
@@ -39,7 +49,7 @@ namespace Bouncer.Wpf.View {
 
         #region Public Methods
 
-        public EditNoteWindow() {
+        public UserWindow() {
             InitializeComponent();
         }
 
@@ -47,14 +57,8 @@ namespace Bouncer.Wpf.View {
 
         #region Private Methods
 
-        private void OnCancel(object sender, RoutedEventArgs e) {
-            DialogResult = false;
-            Close();
-        }
-
-        private void OnOK(object sender, RoutedEventArgs e) {
-            DialogResult = true;
-            Close();
+        private void OnSaveNotes(object sender, RoutedEventArgs e) {
+            Main.SetNote(User, Note.Text);
         }
 
         #endregion

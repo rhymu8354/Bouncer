@@ -54,19 +54,6 @@ namespace Bouncer.Wpf.View {
             configurationWindow.ShowDialog();
         }
 
-        private void OnEditNote(object sender, ExecutedRoutedEventArgs e) {
-            var user = e.Parameter as Model.User;
-            if (user == null) {
-                return;
-            }
-            EditNoteWindow editNoteWindow = new EditNoteWindow();
-            editNoteWindow.Owner = this;
-            editNoteWindow.Model = new Model.UserNote(user);
-            if (editNoteWindow.ShowDialog() ?? false) {
-                Model.SetNote(user, editNoteWindow.Model.Note);
-            }
-        }
-
         private void OnExit(object sender, ExecutedRoutedEventArgs e) {
             Close();
         }
@@ -181,6 +168,24 @@ namespace Bouncer.Wpf.View {
             Model.Unwhitelist(user);
         }
 
+        private void OnUserDoubleClick(object sender, MouseButtonEventArgs e) {
+            var frameworkElement = e.Source as FrameworkElement;
+            if (frameworkElement == null) {
+                return;
+            }
+            var user = frameworkElement.DataContext as Model.User;
+            if (user == null) {
+                return;
+            }
+            var userWindow = new UserWindow();
+            userWindow.Owner = this;
+            userWindow.Main = Model;
+            userWindow.User = user;
+            userWindow.Note.Text = user.Note;
+            userWindow.Show();
+            e.Handled = true;
+        }
+
         private void OnWhitelist(object sender, ExecutedRoutedEventArgs e) {
             var user = e.Parameter as Model.User;
             if (user == null) {
@@ -210,6 +215,5 @@ namespace Bouncer.Wpf.View {
         private SortAdorner UserListSortAdorner { get; set; }
 
         #endregion
-
     }
 }
