@@ -142,6 +142,9 @@ namespace Bouncer.Wpf.View {
         }
 
         private void OnMessagesSelectionChanged(object sender, SelectionChangedEventArgs e) {
+            if (Model.SelectedMessage == null) {
+                return;
+            }
             if (Model.SelectedMessage.Userid == 0) {
                 return;
             }
