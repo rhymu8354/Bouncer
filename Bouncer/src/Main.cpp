@@ -932,8 +932,8 @@ namespace Bouncer {
                                 configuration.newAccountChatterTimeoutExplanation,
                                 variables
                             );
-                            tmi.SendMessage(
-                                configuration.channel,
+                            tmi.SendWhisper(
+                                user.login,
                                 explanation
                             );
                         }
