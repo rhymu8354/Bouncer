@@ -301,6 +301,11 @@ namespace Bouncer {
             double messageTime = 0.0;
         };
 
+        struct WhisperAwaitingProcessing {
+            Twitch::Messaging::WhisperInfo whisperInfo;
+            double messageTime = 0.0;
+        };
+
         enum class State {
             Unconfigured,
             Unconnected,
@@ -396,6 +401,7 @@ namespace Bouncer {
                 if (impl == nullptr) {
                     return;
                 }
+                impl->OnWhisper(std::move(whisperInfo));
             }
 
             virtual void Notice(Twitch::Messaging::NoticeInfo&& noticeInfo) override {
@@ -480,6 +486,7 @@ namespace Bouncer {
 
         std::promise< void > loggedOut;
         std::map< intmax_t, std::queue< MessageAwaitingProcessing > > messagesAwaitingProcessing;
+        std::map< intmax_t, std::queue< WhisperAwaitingProcessing > > whispersAwaitingProcessing;
         std::recursive_mutex mutex;
         double nextApiCallTime = 0.0;
         double nextConfigurationAutoSaveTime = 0.0;
@@ -796,59 +803,23 @@ namespace Bouncer {
                 auto usersByIdEntry = usersById.find(userid);
                 if (usersByIdEntry == usersById.end()) {
                     auto& messagesAwaitingProcessingForUser = messagesAwaitingProcessing[userid];
-                    const auto noMessagesWereAlreadyAwaitingProcessing = messagesAwaitingProcessingForUser.empty();
+                    const auto noMessagesOrWhispersWereAlreadyAwaitingProcessing = (
+                        messagesAwaitingProcessingForUser.empty()
+                        && (whispersAwaitingProcessing.find(userid) == whispersAwaitingProcessing.end())
+                    );
                     MessageAwaitingProcessing messageAwaitingProcessing;
                     messageAwaitingProcessing.messageInfo = std::move(messageInfo);
                     messageAwaitingProcessing.messageTime = messageTime;
                     messagesAwaitingProcessingForUser.push(std::move(messageAwaitingProcessing));
-                    if (noMessagesWereAlreadyAwaitingProcessing) {
+                    if (noMessagesOrWhispersWereAlreadyAwaitingProcessing) {
                         LookupUserById(
                             userid,
-                            [
-                                messageTime,
-                                userid
-                            ](Impl& impl){
-                                auto& messagesAwaitingProcessingForUser = impl.messagesAwaitingProcessing[userid];
-                                while (!messagesAwaitingProcessingForUser.empty()) {
-                                    auto& messageAwaitingProcessing = messagesAwaitingProcessingForUser.front();
-                                    impl.HandleMessage(
-                                        std::move(messageAwaitingProcessing.messageInfo),
-                                        messageAwaitingProcessing.messageTime
-                                    );
-                                    messagesAwaitingProcessingForUser.pop();
-                                }
-                                impl.messagesAwaitingProcessing.erase(userid);
-                            }
+                            std::bind(&Impl::ProcessMessagesAndWhispersAwaitingProcessing, this, userid)
                         );
                     }
                 } else {
                     auto& user = usersByIdEntry->second;
-                    if (user.login != messageInfo.user) {
-                        if (!user.login.empty()) {
-                            diagnosticsSender.SendDiagnosticInformationFormatted(
-                                3,
-                                "Twitch user %" PRIdMAX " login changed from %s to %s",
-                                userid,
-                                user.login.c_str(),
-                                messageInfo.user.c_str()
-                            );
-                            (void)userIdsByLogin.erase(user.login);
-                        }
-                        user.login = messageInfo.user;
-                    }
-                    userIdsByLogin[messageInfo.user] = userid;
-                    if (user.name != messageInfo.tags.displayName) {
-                        if (!user.name.empty()) {
-                            diagnosticsSender.SendDiagnosticInformationFormatted(
-                                3,
-                                "Twitch user %" PRIdMAX " display name changed from %s to %s",
-                                userid,
-                                user.name.c_str(),
-                                messageInfo.tags.displayName.c_str()
-                            );
-                        }
-                        user.name = messageInfo.tags.displayName;
-                    }
+                    UpdateLoginAndName(user, messageInfo.user, messageInfo.tags);
                     user.lastMessageTime = messageTime;
                     if (
                         (user.numMessagesThisInstance == 0)
@@ -995,6 +966,49 @@ namespace Bouncer {
                                 "/ban %s",
                                 user.login.c_str()
                             )
+                        );
+                    }
+                }
+            }
+        }
+
+        void HandleWhisper(
+            const Twitch::Messaging::WhisperInfo&& whisperInfo,
+            double messageTime
+        ) {
+            const auto userid = whisperInfo.tags.userId;
+            if (userid != 0) {
+                auto usersByIdEntry = usersById.find(userid);
+                if (usersByIdEntry == usersById.end()) {
+                    auto& whispersAwaitingProcessingForUser = whispersAwaitingProcessing[userid];
+                    const auto noMessagesOrWhispersWereAlreadyAwaitingProcessing = (
+                        whispersAwaitingProcessingForUser.empty()
+                        && (messagesAwaitingProcessing.find(userid) == messagesAwaitingProcessing.end())
+                    );
+                    WhisperAwaitingProcessing whisperAwaitingProcessing;
+                    whisperAwaitingProcessing.whisperInfo = std::move(whisperInfo);
+                    whisperAwaitingProcessing.messageTime = messageTime;
+                    whispersAwaitingProcessingForUser.push(std::move(whisperAwaitingProcessing));
+                    if (noMessagesOrWhispersWereAlreadyAwaitingProcessing) {
+                        LookupUserById(
+                            userid,
+                            std::bind(&Impl::ProcessMessagesAndWhispersAwaitingProcessing, this, userid)
+                        );
+                    }
+                } else {
+                    auto& user = usersByIdEntry->second;
+                    UpdateLoginAndName(user, whisperInfo.user, whisperInfo.tags);
+                    UserSeen(user, messageTime);
+                    if (configuration.minDiagnosticsLevel <= 3) {
+                        QueueStatus(
+                            3,
+                            SystemAbstractions::sprintf(
+                                "[%s] %s whispered: %s",
+                                FormatTime(messageTime).c_str(),
+                                user.login.c_str(),
+                                whisperInfo.message.c_str()
+                            ),
+                            userid
                         );
                     }
                 }
@@ -1192,6 +1206,11 @@ namespace Bouncer {
             );
         }
 
+        void OnWhisper(Twitch::Messaging::WhisperInfo&& whisperInfo) {
+            std::lock_guard< decltype(mutex) > lock(mutex);
+            HandleWhisper(std::move(whisperInfo), timeKeeper->GetCurrentTime());
+        }
+
         void PostApiCall(std::function< void() > apiCall) {
             apiCalls.Add(apiCall);
             wakeWorker.notify_one();
@@ -1382,6 +1401,29 @@ namespace Bouncer {
                     }
                 }
             );
+        }
+
+        void ProcessMessagesAndWhispersAwaitingProcessing(intmax_t userid) {
+            auto& messagesAwaitingProcessingForUser = messagesAwaitingProcessing[userid];
+            while (!messagesAwaitingProcessingForUser.empty()) {
+                auto& messageAwaitingProcessing = messagesAwaitingProcessingForUser.front();
+                HandleMessage(
+                    std::move(messageAwaitingProcessing.messageInfo),
+                    messageAwaitingProcessing.messageTime
+                );
+                messagesAwaitingProcessingForUser.pop();
+            }
+            messagesAwaitingProcessing.erase(userid);
+            auto& whispersAwaitingProcessingForUser = whispersAwaitingProcessing[userid];
+            while (!whispersAwaitingProcessingForUser.empty()) {
+                auto& whisperAwaitingProcessing = whispersAwaitingProcessingForUser.front();
+                HandleWhisper(
+                    std::move(whisperAwaitingProcessing.whisperInfo),
+                    whisperAwaitingProcessing.messageTime
+                );
+                whispersAwaitingProcessingForUser.pop();
+            }
+            whispersAwaitingProcessing.erase(userid);
         }
 
         void PublishMessages() {
@@ -1632,6 +1674,39 @@ namespace Bouncer {
                         return;
                     }
                 }
+            }
+        }
+
+        void UpdateLoginAndName(
+            User& user,
+            const std::string& login,
+            const Twitch::Messaging::TagsInfo& tags
+        ) {
+            if (user.login != login) {
+                if (!user.login.empty()) {
+                    diagnosticsSender.SendDiagnosticInformationFormatted(
+                        3,
+                        "Twitch user %" PRIdMAX " login changed from %s to %s",
+                        user.id,
+                        user.login.c_str(),
+                        login.c_str()
+                    );
+                    (void)userIdsByLogin.erase(user.login);
+                }
+                user.login = login;
+            }
+            userIdsByLogin[login] = user.id;
+            if (user.name != tags.displayName) {
+                if (!user.name.empty()) {
+                    diagnosticsSender.SendDiagnosticInformationFormatted(
+                        3,
+                        "Twitch user %" PRIdMAX " display name changed from %s to %s",
+                        user.id,
+                        user.name.c_str(),
+                        tags.displayName.c_str()
+                    );
+                }
+                user.name = tags.displayName;
             }
         }
 
