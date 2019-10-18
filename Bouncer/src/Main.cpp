@@ -1920,6 +1920,7 @@ namespace Bouncer {
         );
         statsSnapshot.totalViewTimeRecorded += viewTimerTotalTime;
         statsSnapshot.totalViewTimeRecordedThisInstance += viewTimerTotalTime;
+        statsSnapshot.numViewersKnown = impl_->usersById.size();
         return statsSnapshot;
     }
 

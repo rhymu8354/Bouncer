@@ -586,10 +586,11 @@ namespace Bouncer.Wpf.Model {
                     return "";
                 }
                 return String.Format(
-                    "{0} / {1} / {2}",
+                    "{0} / {1} / {2} / {3}",
                     Stats.currentViewerCount,
                     Stats.maxViewerCountThisInstance,
-                    Stats.maxViewerCount
+                    Stats.maxViewerCount,
+                    Stats.numViewersKnown
                 );
             }
         }

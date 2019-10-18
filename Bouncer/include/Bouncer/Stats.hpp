@@ -21,6 +21,7 @@ namespace Bouncer {
         size_t currentViewerCount = 0;
         size_t maxViewerCount = 0;
         size_t maxViewerCountThisInstance = 0;
+        size_t numViewersKnown = 0;
     };
 
 }
