@@ -46,6 +46,7 @@ namespace {
     constexpr size_t maxUserChatLines = 10;
     constexpr int maxTimeoutSeconds = 1209600;
     constexpr size_t maxTwitchUserLookupsByLogin = 100;
+    constexpr double reconnectCooldown = 5.0;
     constexpr double streamCheckCooldown = 60.0;
     constexpr double twitchApiLookupCooldown = 1.0;
 
@@ -303,6 +304,7 @@ namespace Bouncer {
         enum class State {
             Unconfigured,
             Unconnected,
+            Connecting,
             OutsideRoom,
             InsideRoom,
         };
@@ -325,6 +327,14 @@ namespace Bouncer {
             std::weak_ptr< Impl > implWeak;
 
             // Twitch::Messaging::User
+
+            virtual void Doom() override {
+                const auto impl = implWeak.lock();
+                if (impl == nullptr) {
+                    return;
+                }
+                impl->OnDoom();
+            }
 
             virtual void LogIn() override {
                 const auto impl = implWeak.lock();
@@ -482,6 +492,7 @@ namespace Bouncer {
         int nextHttpClientTransactionId = 1;
 
         double nextStreamCheck = 0.0;
+        double reconnectTime = 0.0;
         std::weak_ptr< Impl > selfWeak;
         State state = State::Unconfigured;
         Stats stats;
@@ -690,7 +701,7 @@ namespace Bouncer {
         }
 
         void LogIn() {
-            state = State::Unconnected;
+            state = State::Connecting;
             loggedOut = decltype(loggedOut)();
             tmi.LogIn(
                 configuration.account,
@@ -1089,6 +1100,11 @@ namespace Bouncer {
             HandleClear(std::move(clearInfo), timeKeeper->GetCurrentTime());
         }
 
+        void OnDoom() {
+            std::lock_guard< decltype(mutex) > lock(mutex);
+            PostStatus("Reconnect requested");
+        }
+
         void OnJoin(Twitch::Messaging::MembershipInfo&& membershipInfo) {
             std::lock_guard< decltype(mutex) > lock(mutex);
             if (membershipInfo.user == configuration.account) {
@@ -1124,7 +1140,7 @@ namespace Bouncer {
         void OnLogIn() {
             std::lock_guard< decltype(mutex) > lock(mutex);
             PostStatus("Logged in");
-            if (state == State::Unconnected) {
+            if (state == State::Connecting) {
                 state = State::OutsideRoom;
                 tmi.Join(configuration.channel);
             }
@@ -1133,6 +1149,7 @@ namespace Bouncer {
         void OnLogOut() {
             std::lock_guard< decltype(mutex) > lock(mutex);
             switch (state) {
+                case State::Connecting:
                 case State::OutsideRoom:
                 case State::InsideRoom: {
                     loggedOut.set_value();
@@ -1142,6 +1159,17 @@ namespace Bouncer {
 
                 default: break;
             }
+            const auto now = timeKeeper->GetCurrentTime();
+            for (auto& usersByIdEntry: usersById) {
+                auto& user = usersByIdEntry.second;
+                if (user.isJoined) {
+                    user.isJoined = false;
+                    user.totalViewTime += (now - user.joinTime);
+                }
+            }
+            stats.currentViewerCount = 0;
+            reconnectTime = now + reconnectCooldown;
+            wakeWorker.notify_one();
         }
 
         void OnMessage(Twitch::Messaging::MessageInfo&& messageInfo) {
@@ -1788,6 +1816,13 @@ namespace Bouncer {
                 ) {
                     NextApiCall();
                 }
+                if (
+                    (state == State::Unconnected)
+                    && (now >= reconnectTime)
+                ) {
+                    PostStatus("Reconnecting");
+                    LogIn();
+                }
                 auto nextTimeout = std::min(
                     nextConfigurationAutoSaveTime,
                     nextStreamCheck
@@ -1797,6 +1832,9 @@ namespace Bouncer {
                     && (nextApiCallTime != 0.0)
                 ) {
                     nextTimeout = std::min(nextTimeout, nextApiCallTime);
+                }
+                if (state == State::Unconnected) {
+                    nextTimeout = std::min(nextTimeout, reconnectTime);
                 }
                 const auto nowClock = std::chrono::system_clock::now();
                 now = timeKeeper->GetCurrentTime();
