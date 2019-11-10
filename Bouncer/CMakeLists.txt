@@ -31,6 +31,7 @@ target_link_libraries(${This} PUBLIC
     Http
     HttpNetworkTransport
     Json
+    StringExtensions
     SystemAbstractions
     TlsDecorator
     Twitch

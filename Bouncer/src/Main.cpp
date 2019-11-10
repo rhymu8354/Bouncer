@@ -32,11 +32,11 @@
 #include <Twitch/Messaging.hpp>
 #include <TwitchNetworkTransport/Connection.hpp>
 #include <sstream>
+#include <StringExtensions/StringExtensions.hpp>
 #include <SystemAbstractions/DiagnosticsSender.hpp>
 #include <SystemAbstractions/DiagnosticsStreamReporter.hpp>
 #include <SystemAbstractions/File.hpp>
 #include <SystemAbstractions/NetworkConnection.hpp>
-#include <SystemAbstractions/StringExtensions.hpp>
 #include <vector>
 
 namespace {
@@ -839,7 +839,7 @@ namespace Bouncer {
                     }
                     UpdateRole(user, messageInfo.tags.badges);
                     user.lastChat.push_back(
-                        SystemAbstractions::sprintf(
+                        StringExtensions::sprintf(
                             "%06zu - %s - %s",
                             user.numMessages,
                             FormatDateTime(messageTime).c_str(),
@@ -853,7 +853,7 @@ namespace Bouncer {
                         if (messageInfo.isAction) {
                             QueueStatus(
                                 3,
-                                SystemAbstractions::sprintf(
+                                StringExtensions::sprintf(
                                     "[%s] %s %s",
                                     FormatTime(messageTime).c_str(),
                                     user.login.c_str(),
@@ -864,7 +864,7 @@ namespace Bouncer {
                         } else {
                             QueueStatus(
                                 3,
-                                SystemAbstractions::sprintf(
+                                StringExtensions::sprintf(
                                     "[%s] %s: %s",
                                     FormatTime(messageTime).c_str(),
                                     user.login.c_str(),
@@ -883,7 +883,7 @@ namespace Bouncer {
                             messageInfo.messageContent.substr(0, greetingPatternLength)
                             == configuration.greetingPattern
                         ) {
-                            const auto target = SystemAbstractions::Trim(
+                            const auto target = StringExtensions::Trim(
                                 messageInfo.messageContent.substr(greetingPatternLength)
                             );
                             const auto userIdsByLoginEntry = userIdsByLogin.find(target);
@@ -939,7 +939,7 @@ namespace Bouncer {
                         }
                         tmi.SendMessage(
                             configuration.channel,
-                            SystemAbstractions::sprintf(
+                            StringExtensions::sprintf(
                                 "/timeout %s %d",
                                 user.login.c_str(),
                                 seconds
@@ -962,7 +962,7 @@ namespace Bouncer {
                         );
                         tmi.SendMessage(
                             configuration.channel,
-                            SystemAbstractions::sprintf(
+                            StringExtensions::sprintf(
                                 "/ban %s",
                                 user.login.c_str()
                             )
@@ -1002,7 +1002,7 @@ namespace Bouncer {
                     if (configuration.minDiagnosticsLevel <= 3) {
                         QueueStatus(
                             3,
-                            SystemAbstractions::sprintf(
+                            StringExtensions::sprintf(
                                 "[%s] %s whispered: %s",
                                 FormatTime(messageTime).c_str(),
                                 user.login.c_str(),
@@ -1019,7 +1019,7 @@ namespace Bouncer {
             intmax_t userid,
             std::function< void(Impl& impl) > after
         ) {
-            const auto targetUriString = SystemAbstractions::sprintf(
+            const auto targetUriString = StringExtensions::sprintf(
                 "https://api.twitch.tv/kraken/users/%" PRIdMAX,
                 userid
             );
@@ -1650,7 +1650,7 @@ namespace Bouncer {
         ) {
             user.role = User::Role::Pleb;
             for (const auto& badge: badges) {
-                const auto badgeParts = SystemAbstractions::Split(badge, '/');
+                const auto badgeParts = StringExtensions::Split(badge, '/');
                 if (badgeParts.size() >= 1) {
                     if (badgeParts[0] == "vip") {
                         user.role = User::Role::VIP;
@@ -1972,7 +1972,7 @@ namespace Bouncer {
         );
         impl_->tmi.SendMessage(
             impl_->configuration.channel,
-            SystemAbstractions::sprintf(
+            StringExtensions::sprintf(
                 "/ban %s",
                 usersByIdEntry->second.login.c_str()
             )
@@ -2185,7 +2185,7 @@ namespace Bouncer {
         );
         impl_->tmi.SendMessage(
             impl_->configuration.channel,
-            SystemAbstractions::sprintf(
+            StringExtensions::sprintf(
                 "/timeout %s %d",
                 usersByIdEntry->second.login.c_str(),
                 seconds
@@ -2218,7 +2218,7 @@ namespace Bouncer {
         );
         impl_->tmi.SendMessage(
             impl_->configuration.channel,
-            SystemAbstractions::sprintf(
+            StringExtensions::sprintf(
                 "/unban %s",
                 usersByIdEntry->second.login.c_str()
             )
