@@ -134,7 +134,7 @@ namespace {
         std::string& fileContents
     ) {
         SystemAbstractions::File file(filePath);
-        if (file.Open()) {
+        if (file.OpenReadOnly()) {
             std::vector< uint8_t > fileContentsAsVector(file.GetSize());
             if (file.Read(fileContentsAsVector) != fileContentsAsVector.size()) {
                 diagnosticsSender.SendDiagnosticInformationFormatted(
@@ -242,7 +242,7 @@ namespace {
         const std::string& fileContents
     ) {
         SystemAbstractions::File file(filePath);
-        if (file.Create()) {
+        if (file.OpenReadWrite()) {
             SystemAbstractions::IFile::Buffer buffer(
                 fileContents.begin(),
                 fileContents.end()
