@@ -1088,6 +1088,30 @@ namespace Bouncer {
             );
         }
 
+        void LookupUserByName(
+            const std::string& name,
+            std::function< void(Impl& impl) > after
+        ) {
+            const auto targetUriString = StringExtensions::sprintf(
+                "https://api.twitch.tv/kraken/users?login=%s",
+                name.c_str()
+            );
+            PostApiCall(
+                targetUriString,
+                true,
+                [
+                    after,
+                    name
+                ](
+                    Impl& impl,
+                    int id,
+                    const Http::IClient::Transaction& transaction
+                ){
+                    impl.OnLookupUsersByNamesResponse(id, transaction.response, after);
+                }
+            );
+        }
+
         void NextApiCall() {
             if (apiCalls.IsEmpty()) {
                 nextApiCallTime = 0.0;
@@ -1184,6 +1208,92 @@ namespace Bouncer {
             stats.currentViewerCount = 0;
             reconnectTime = now + reconnectCooldown;
             wakeWorker.notify_one();
+        }
+
+        void OnLookupUsersByNamesResponse(
+            int id,
+            const Http::Response& response,
+            std::function< void(Impl& impl) > after
+        ) {
+            if (response.statusCode == 200) {
+                const auto users = Json::Value::FromEncoding(response.body)["users"];
+                for (size_t i = 0; i < users.GetSize(); ++i) {
+                    const auto& userEncoded = users[i];
+                    intmax_t userid;
+                    if (
+                        sscanf(
+                            ((std::string)userEncoded["_id"]).c_str(), "%" SCNdMAX,
+                            &userid
+                        ) != 1
+                    ) {
+                        diagnosticsSender.SendDiagnosticInformationFormatted(
+                            SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                            "Twitch API call %d returned user %zu with invalid ID",
+                            id,
+                            i
+                        );
+                        continue;
+                    }
+                    const auto login = (std::string)userEncoded["name"];
+                    if (login.empty()) {
+                        diagnosticsSender.SendDiagnosticInformationFormatted(
+                            SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                            "Twitch API call %d returned user %zu with missing login",
+                            id,
+                            i
+                        );
+                        continue;
+                    }
+                    double joinTime = 0.0;
+                    auto userLookupsByLoginEntry = userJoinsByLogin.find(login);
+                    if (userLookupsByLoginEntry != userJoinsByLogin.end()) {
+                        joinTime = userLookupsByLoginEntry->second;
+                        (void)userJoinsByLogin.erase(userLookupsByLoginEntry);
+                    }
+                    userIdsByLogin[login] = userid;
+                    auto& user = usersById[userid];
+                    user.id = userid;
+                    if (user.login != login) {
+                        if (!user.login.empty()) {
+                            diagnosticsSender.SendDiagnosticInformationFormatted(
+                                3,
+                                "Twitch user %" PRIdMAX " login changed from %s to %s",
+                                userid,
+                                user.login.c_str(),
+                                login.c_str()
+                            );
+                            (void)userIdsByLogin.erase(user.login);
+                        }
+                        user.login = login;
+                    }
+                    const auto name = (std::string)userEncoded["display_name"];
+                    if (user.name != name) {
+                        if (!user.name.empty()) {
+                            diagnosticsSender.SendDiagnosticInformationFormatted(
+                                3,
+                                "Twitch user %" PRIdMAX " display name changed from %s to %s",
+                                userid,
+                                user.name.c_str(),
+                                name.c_str()
+                            );
+                        }
+                        user.name = name;
+                    }
+                    user.createdAt = ParseTimestamp((std::string)userEncoded["created_at"]);
+                    if (joinTime != 0.0) {
+                        UserSeen(user, joinTime);
+                        UserJoined(userid, joinTime);
+                    }
+                }
+                after(*this);
+            } else {
+                diagnosticsSender.SendDiagnosticInformationFormatted(
+                    SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                    "Twitch API call %d returned code %u",
+                    id,
+                    response.statusCode
+                );
+            }
         }
 
         void OnMessage(Twitch::Messaging::MessageInfo&& messageInfo) {
@@ -1316,89 +1426,7 @@ namespace Bouncer {
                     int id,
                     const Http::IClient::Transaction& transaction
                 ){
-                    if (transaction.response.statusCode == 200) {
-                        const auto users = Json::Value::FromEncoding(transaction.response.body)["users"];
-                        for (size_t i = 0; i < users.GetSize(); ++i) {
-                            const auto& userEncoded = users[i];
-                            intmax_t userid;
-                            if (
-                                sscanf(
-                                    ((std::string)userEncoded["_id"]).c_str(), "%" SCNdMAX,
-                                    &userid
-                                ) != 1
-                            ) {
-                                impl.diagnosticsSender.SendDiagnosticInformationFormatted(
-                                    SystemAbstractions::DiagnosticsSender::Levels::WARNING,
-                                    "Twitch API call %d returned user %zu with invalid ID",
-                                    id,
-                                    i
-                                );
-                                continue;
-                            }
-                            const auto login = (std::string)userEncoded["name"];
-                            if (login.empty()) {
-                                impl.diagnosticsSender.SendDiagnosticInformationFormatted(
-                                    SystemAbstractions::DiagnosticsSender::Levels::WARNING,
-                                    "Twitch API call %d returned user %zu with missing login",
-                                    id,
-                                    i
-                                );
-                                continue;
-                            }
-                            auto userLookupsByLoginEntry = impl.userJoinsByLogin.find(login);
-                            if (userLookupsByLoginEntry == impl.userJoinsByLogin.end()) {
-                                impl.diagnosticsSender.SendDiagnosticInformationFormatted(
-                                    SystemAbstractions::DiagnosticsSender::Levels::WARNING,
-                                    "Twitch API call %d returned user %zu with unexpected login (%s)",
-                                    id,
-                                    i,
-                                    login.c_str()
-                                );
-                                continue;
-                            }
-                            const auto joinTime = userLookupsByLoginEntry->second;
-                            (void)impl.userJoinsByLogin.erase(userLookupsByLoginEntry);
-                            impl.userIdsByLogin[login] = userid;
-                            auto& user = impl.usersById[userid];
-                            user.id = userid;
-                            if (user.login != login) {
-                                if (!user.login.empty()) {
-                                    impl.diagnosticsSender.SendDiagnosticInformationFormatted(
-                                        3,
-                                        "Twitch user %" PRIdMAX " login changed from %s to %s",
-                                        userid,
-                                        user.login.c_str(),
-                                        login.c_str()
-                                    );
-                                    (void)impl.userIdsByLogin.erase(user.login);
-                                }
-                                user.login = login;
-                            }
-                            const auto name = (std::string)userEncoded["display_name"];
-                            if (user.name != name) {
-                                if (!user.name.empty()) {
-                                    impl.diagnosticsSender.SendDiagnosticInformationFormatted(
-                                        3,
-                                        "Twitch user %" PRIdMAX " display name changed from %s to %s",
-                                        userid,
-                                        user.name.c_str(),
-                                        name.c_str()
-                                    );
-                                }
-                                user.name = name;
-                            }
-                            user.createdAt = ParseTimestamp((std::string)userEncoded["created_at"]);
-                            impl.UserSeen(user, joinTime);
-                            impl.UserJoined(userid, joinTime);
-                        }
-                    } else {
-                        impl.diagnosticsSender.SendDiagnosticInformationFormatted(
-                            SystemAbstractions::DiagnosticsSender::Levels::WARNING,
-                            "Twitch API call %d returned code %u",
-                            id,
-                            transaction.response.statusCode
-                        );
-                    }
+                    impl.OnLookupUsersByNamesResponse(id, transaction.response, [](Impl&){});
                 }
             );
         }
@@ -1435,6 +1463,51 @@ namespace Bouncer {
                     statusMessage.userid
                 );
             }
+        }
+
+        void QueryChannelStats() {
+            const auto userIdsByLoginEntry = userIdsByLogin.find(configuration.channel);
+            if (userIdsByLoginEntry == userIdsByLogin.end()) {
+                LookupUserByName(
+                    configuration.channel,
+                    [](Impl& impl){ impl.QueryChannelStats(); }
+                );
+                return;
+            }
+            const auto channelId = userIdsByLoginEntry->second;
+            PostApiCall(
+                StringExtensions::sprintf(
+                    "https://api.twitch.tv/kraken/channels/%" PRIdMAX,
+                    channelId
+                ),
+                true,
+                [channelId](
+                    Impl& impl,
+                    int id,
+                    const Http::IClient::Transaction& transaction
+                ){
+                    if (transaction.response.statusCode == 200) {
+                        const auto responseDecoded = Json::Value::FromEncoding(transaction.response.body);
+                        const intmax_t views = responseDecoded["views"];
+                        const intmax_t followers = responseDecoded["followers"];
+                        impl.diagnosticsSender.SendDiagnosticInformationFormatted(
+                            3,
+                            "Twitch channel %" PRIdMAX " (%s) now has %" PRIdMAX " views and %" PRIdMAX " followers",
+                            channelId,
+                            impl.configuration.channel.c_str(),
+                            views,
+                            followers
+                        );
+                    } else {
+                        impl.diagnosticsSender.SendDiagnosticInformationFormatted(
+                            SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                            "Twitch API call %d returned code %u",
+                            id,
+                            transaction.response.statusCode
+                        );
+                    }
+                }
+            );
         }
 
         void SaveConfiguration() {
@@ -2040,6 +2113,11 @@ namespace Bouncer {
         }
         auto& user = usersByIdEntry->second;
         user.needsGreeting = false;
+    }
+
+    void Main::QueryChannelStats() {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        impl_->QueryChannelStats();
     }
 
     void Main::SetBotStatus(intmax_t userid, User::Bot bot) {

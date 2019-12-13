@@ -48,6 +48,8 @@ namespace Bouncer {
 
         void MarkGreeted(intmax_t userid);
 
+        void QueryChannelStats();
+
         void SetBotStatus(intmax_t userid, User::Bot bot);
 
         void SetConfiguration(const Configuration& configuration);

@@ -125,6 +125,10 @@ namespace Bouncer.Wpf.View {
             Model.SetBotStatus(user, User.Bot.Unknown);
         }
 
+        private void OnQueryChannelStats(object sender, ExecutedRoutedEventArgs e) {
+            Model.QueryChannelStats();
+        }
+
         private void OnStartWatching(object sender, ExecutedRoutedEventArgs e) {
             var user = e.Parameter as Model.User;
             if (user == null) {

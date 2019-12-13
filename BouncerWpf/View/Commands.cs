@@ -16,6 +16,7 @@ namespace Bouncer.Wpf.View {
         public static RoutedUICommand MarkGreeted { get; private set; }
         public static RoutedUICommand MarkNotBot { get; private set; }
         public static RoutedUICommand MarkPossibleBot { get; private set; }
+        public static RoutedUICommand QueryChannelStats { get; private set; }
         public static RoutedUICommand StartWatching { get; private set; }
         public static RoutedUICommand StopWatching { get; private set; }
         public static RoutedUICommand TimeOut { get; private set; }
@@ -37,6 +38,7 @@ namespace Bouncer.Wpf.View {
             MarkGreeted = new RoutedUICommand("Mark Greeted", "MarkGreeted", typeof(Commands));
             MarkNotBot = new RoutedUICommand("Mark As Not a Bot", "MarkNotBot", typeof(Commands));
             MarkPossibleBot = new RoutedUICommand("Mark As a Possible Bot", "MarkPossibleBot", typeof(Commands));
+            QueryChannelStats = new RoutedUICommand("Query Channel Statistics", "QueryChannelStats", typeof(Commands));
             StartWatching = new RoutedUICommand("Start Watching", "StartWatching", typeof(Commands));
             StopWatching = new RoutedUICommand("Stop Watching", "StopWatching", typeof(Commands));
             TimeOut = new RoutedUICommand("Time Out", "TimeOut", typeof(Commands));

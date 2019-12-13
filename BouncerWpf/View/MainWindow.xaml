@@ -15,6 +15,7 @@
         <CommandBinding Command="local:Commands.MarkGreeted" Executed="OnMarkGreeted" />
         <CommandBinding Command="local:Commands.MarkNotBot" Executed="OnMarkNotBot" />
         <CommandBinding Command="local:Commands.MarkPossibleBot" Executed="OnMarkPossibleBot" />
+        <CommandBinding Command="local:Commands.QueryChannelStats" Executed="OnQueryChannelStats" />
         <CommandBinding Command="local:Commands.StartWatching" Executed="OnStartWatching" />
         <CommandBinding Command="local:Commands.StopWatching" Executed="OnStopWatching" />
         <CommandBinding Command="local:Commands.TimeOut" Executed="OnTimeOut" />
@@ -38,6 +39,7 @@
             </MenuItem>
             <MenuItem Header="_Channel">
                 <MenuItem Header="_View Timer" IsCheckable="True" IsChecked="{Binding ViewTimerRunning}" />
+                <MenuItem Header="_Query Stats" Command="local:Commands.QueryChannelStats" />
             </MenuItem>
             <MenuItem Header="_Viewers">
                 <MenuItem Header="Show _All Viewers" IsCheckable="True" IsChecked="{Binding ShowAllViewers}" />

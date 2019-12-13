@@ -642,6 +642,10 @@ namespace Bouncer.Wpf.Model {
             Native.MarkGreeted(user.Id);
         }
 
+        public void QueryChannelStats() {
+            Native.QueryChannelStats();
+        }
+
         public void SetBotStatus(User user, Bouncer.User.Bot bot) {
             Native.SetBotStatus(user.Id, bot);
         }
