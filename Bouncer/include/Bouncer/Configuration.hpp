@@ -9,6 +9,7 @@
  */
 
 #include <string>
+#include <vector>
 
 namespace Bouncer {
 
@@ -28,6 +29,8 @@ namespace Bouncer {
         size_t minDiagnosticsLevel = 0;
         bool autoTimeOutNewAccountChatters = false;
         bool autoBanTitleScammers = false;
+        bool autoBanForbiddenWords = false;
+        std::vector< std::string > forbiddenWords;
     };
 
 }

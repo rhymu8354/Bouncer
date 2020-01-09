@@ -1,0 +1,83 @@
+<Window x:Class="Bouncer.Wpf.View.ConfigureForbiddenWordsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:local="clr-namespace:Bouncer.Wpf.View"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:scm="clr-namespace:System.ComponentModel;assembly=WindowsBase"
+        mc:Ignorable="d"
+        Title="Bouncer Forbidden Words" Width="400" Height="600"
+        Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResizeWithGrip" ShowInTaskbar="False"
+        FocusManager.FocusedElement="{Binding ElementName=NewForbiddenWord}"
+>
+    <Window.Resources>
+        <CollectionViewSource x:Key="SortedForbiddenWords" Source="{Binding ForbiddenWords}">
+            <CollectionViewSource.SortDescriptions>
+                <scm:SortDescription />
+            </CollectionViewSource.SortDescriptions>
+        </CollectionViewSource>
+    </Window.Resources>
+    <Grid Margin="10">
+        <Grid.CommandBindings>
+            <CommandBinding Command="ApplicationCommands.New" Executed="OnNewForbiddenWord" />
+        </Grid.CommandBindings>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="auto" />
+        </Grid.RowDefinitions>
+        <ListBox
+            Grid.Row="0" x:Name="ForbiddenWords"
+            ItemsSource="{Binding Source={StaticResource SortedForbiddenWords}}"
+            SelectedItem="{Binding SelectedForbiddenWord}"
+            HorizontalContentAlignment="Stretch"
+            SelectionChanged="OnForbiddenWordsSelectionChanged"
+            AllowDrop="True"
+        >
+            <ListBox.CommandBindings>
+                <CommandBinding Command="local:Commands.Submit" Executed="OnSubmitForbiddenWord" />
+                <CommandBinding Command="ApplicationCommands.Delete" Executed="OnDeleteForbiddenWord" />
+            </ListBox.CommandBindings>
+            <ListBox.Resources>
+                <DataTemplate x:Key="NormalTemplate">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{Binding}" MouseDown="OnForbiddenWordClicked" Tag="{Binding}" />
+                        <Button Grid.Column="1" Width="25" Content="-" Command="ApplicationCommands.Delete" CommandParameter="{Binding}" HorizontalAlignment="Right" />
+                    </Grid>
+                </DataTemplate>
+                <DataTemplate x:Key="EditingTemplate">
+                    <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Tag="{Binding}">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Enter" Command="local:Commands.Submit" />
+                        </TextBox.InputBindings>
+                    </TextBox>
+                </DataTemplate>
+            </ListBox.Resources>
+            <ListBox.ItemTemplateSelector>
+                <local:ChosenItemDataTemplateSelector
+                    x:Name="FileListItemDataTemplateSelector"
+                    NormalItemTemplate="{StaticResource NormalTemplate}"
+                    ChosenItemTemplate="{StaticResource EditingTemplate}"
+                />
+            </ListBox.ItemTemplateSelector>
+        </ListBox>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="NewForbiddenWord">
+                <TextBox.InputBindings>
+                    <KeyBinding Key="Enter" Command="ApplicationCommands.New" />
+                </TextBox.InputBindings>
+            </TextBox>
+            <Button Grid.Column="1" Width="25" Content="+" Command="ApplicationCommands.New" CommandParameter="{Binding}" HorizontalAlignment="Right" />
+        </Grid>
+        <Button Grid.Row="2" Margin="20,10" Content="OK" Width="75" HorizontalAlignment="Center" VerticalAlignment="Center" Click="OnOK" IsCancel="True" />
+    </Grid>
+</Window>

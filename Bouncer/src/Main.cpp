@@ -643,6 +643,7 @@ namespace Bouncer {
             configuration.minDiagnosticsLevel = (size_t)json["minDiagnosticsLevel"];
             configuration.autoTimeOutNewAccountChatters = (bool)json["autoTimeOutNewAccountChatters"];
             configuration.autoBanTitleScammers = (bool)json["autoBanTitleScammers"];
+            configuration.autoBanForbiddenWords = (bool)json["autoBanForbiddenWords"];
             stats.maxViewerCount = (size_t)json["maxViewerCount"];
             stats.totalViewTimeRecorded = (double)json["totalViewTimeRecorded"];
             const auto& users = json["users"];
@@ -703,6 +704,13 @@ namespace Bouncer {
                     user.lastChat.push_back((std::string)lastChat[j]);
                 }
                 userIdsByLogin[user.login] = userid;
+            }
+            const auto& forbiddenWords = json["forbiddenWords"];
+            const auto numForbiddenWords = forbiddenWords.GetSize();
+            configuration.forbiddenWords.clear();
+            configuration.forbiddenWords.reserve(numForbiddenWords);
+            for (size_t i = 0; i < numForbiddenWords; ++i) {
+                configuration.forbiddenWords.push_back(forbiddenWords[i]);
             }
             configurationChanged = true;
         }
@@ -967,6 +975,35 @@ namespace Bouncer {
                                 user.login.c_str()
                             )
                         );
+                    }
+                    if (
+                        configuration.autoBanForbiddenWords
+                        && (user.role == User::Role::Pleb)
+                        && !user.isWhitelisted
+                    ) {
+                        std::string forbiddenWordFound;
+                        for (const auto& forbiddenWord: configuration.forbiddenWords) {
+                            if (messageInfo.messageContent.find(forbiddenWord) != std::string::npos) {
+                                forbiddenWordFound = forbiddenWord;
+                                break;
+                            }
+                        }
+                        if (!forbiddenWordFound.empty()) {
+                            diagnosticsSender.SendDiagnosticInformationFormatted(
+                                3,
+                                "Forbiden word '%s' spoken by user %" PRIdMAX " (%s) -- applying ban hammer",
+                                forbiddenWordFound.c_str(),
+                                user.id,
+                                user.login.c_str()
+                            );
+                            tmi.SendMessage(
+                                configuration.channel,
+                                StringExtensions::sprintf(
+                                    "/ban %s",
+                                    user.login.c_str()
+                                )
+                            );
+                        }
                     }
                 }
             }
@@ -1531,9 +1568,11 @@ namespace Bouncer {
                 {"minDiagnosticsLevel", configuration.minDiagnosticsLevel},
                 {"autoTimeOutNewAccountChatters", configuration.autoTimeOutNewAccountChatters},
                 {"autoBanTitleScammers", configuration.autoBanTitleScammers},
+                {"autoBanForbiddenWords", configuration.autoBanForbiddenWords},
                 {"users", Json::Array({})},
                 {"maxViewerCount", stats.maxViewerCount},
                 {"totalViewTimeRecorded", totalViewTimeRecorded},
+                {"forbiddenWords", Json::Array({})},
             });
             auto& users = json["users"];
             for (const auto& usersByIdEntry: usersById) {
@@ -1605,6 +1644,10 @@ namespace Bouncer {
                     lastChat.Add(line);
                 }
                 users.Add(std::move(userEncoded));
+            }
+            auto& forbiddenWords = json["forbiddenWords"];
+            for (const auto& forbiddenWord: configuration.forbiddenWords) {
+                forbiddenWords.Add(forbiddenWord);
             }
 
             Json::EncodingOptions jsonEncodingOptions;

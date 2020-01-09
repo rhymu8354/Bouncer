@@ -29,9 +29,12 @@ if(MSVC)
         Properties/Resources.resx
         Properties/Resources.Designer.cs
         Utilities.cs
+        View/ChosenItemDataTemplateSelector.cs
         View/Commands.cs
         View/ConfigurationWindow.xaml
         View/ConfigurationWindow.xaml.cs
+        View/ConfigureForbiddenWordsWindow.xaml
+        View/ConfigureForbiddenWordsWindow.xaml.cs
         View/FindDescendant.cs
         View/ListBoxExtensions.cs
         View/MainWindow.xaml

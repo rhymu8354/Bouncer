@@ -70,6 +70,13 @@ namespace Bouncer.Wpf.View {
             Configuration = null;
         }
 
+        private void OnConfigureForbiddenWords(object sender, ExecutedRoutedEventArgs e) {
+            ConfigureForbiddenWordsWindow configureForbiddenWordsWindow = new ConfigureForbiddenWordsWindow();
+            configureForbiddenWordsWindow.Owner = this;
+            configureForbiddenWordsWindow.Configuration = Configuration;
+            configureForbiddenWordsWindow.ShowDialog();
+        }
+
         private void OnLoaded(object sender, RoutedEventArgs e) {
             Configuration = Model.Configuration;
         }
@@ -80,6 +87,5 @@ namespace Bouncer.Wpf.View {
         }
 
         #endregion
-
     }
 }

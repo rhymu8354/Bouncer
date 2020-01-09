@@ -1,6 +1,7 @@
 using Bouncer.Wpf.Properties;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
@@ -48,6 +49,16 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public bool AutoBanForbiddenWords {
+            get {
+                return Adaptee.autoBanForbiddenWords;
+            }
+            set {
+                Adaptee.autoBanForbiddenWords = value;
+                NotifyPropertyChanged("AutoBanForbiddenWords");
+            }
+        }
+
         public bool AutoTimeOutNewAccountChatters {
             get {
                 return Adaptee.autoTimeOutNewAccountChatters;
@@ -86,6 +97,11 @@ namespace Bouncer.Wpf.Model {
                 Adaptee.channel = value;
                 NotifyPropertyChanged("Channel");
             }
+        }
+
+        public ObservableStdVector<StdVectorString, string> ForbiddenWords {
+            get;
+            private set;
         }
 
         public string GreetingPattern {
@@ -144,6 +160,7 @@ namespace Bouncer.Wpf.Model {
 
         public Configuration(Bouncer.Configuration adaptee) {
             Adaptee = adaptee;
+            ForbiddenWords = new ObservableStdVector<StdVectorString, string>(Adaptee.forbiddenWords);
         }
 
         #endregion

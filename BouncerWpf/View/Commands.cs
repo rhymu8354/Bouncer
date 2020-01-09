@@ -19,6 +19,7 @@ namespace Bouncer.Wpf.View {
         public static RoutedUICommand QueryChannelStats { get; private set; }
         public static RoutedUICommand StartWatching { get; private set; }
         public static RoutedUICommand StopWatching { get; private set; }
+        public static RoutedUICommand Submit { get; private set; }
         public static RoutedUICommand TimeOut { get; private set; }
         public static RoutedUICommand Unban { get; private set; }
         public static RoutedUICommand Unwhitelist { get; private set; }
@@ -41,6 +42,7 @@ namespace Bouncer.Wpf.View {
             QueryChannelStats = new RoutedUICommand("Query Channel Statistics", "QueryChannelStats", typeof(Commands));
             StartWatching = new RoutedUICommand("Start Watching", "StartWatching", typeof(Commands));
             StopWatching = new RoutedUICommand("Stop Watching", "StopWatching", typeof(Commands));
+            Submit = new RoutedUICommand("Submit", "Submit", typeof(Commands));
             TimeOut = new RoutedUICommand("Time Out", "TimeOut", typeof(Commands));
             Unban = new RoutedUICommand("Unban", "Unban", typeof(Commands));
             Unwhitelist = new RoutedUICommand("Unwhitelist", "Unwhitelist", typeof(Commands));
