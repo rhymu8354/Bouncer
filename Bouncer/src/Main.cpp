@@ -1396,6 +1396,15 @@ namespace Bouncer {
                     request.headers.SetHeader("Client-ID", configuration.clientId);
                     if (isKraken) {
                         request.headers.SetHeader("Accept", "application/vnd.twitchtv.v5+json");
+                        request.headers.SetHeader(
+                            "Authorization",
+                            std::string("OAuth ") + configuration.token
+                        );
+                    } else {
+                        request.headers.SetHeader(
+                            "Authorization",
+                            std::string("Bearer ") + configuration.token
+                        );
                     }
                     auto& httpClientTransaction = httpClientTransactions[id];
                     httpClientTransaction = httpClient->Request(request);
