@@ -1428,6 +1428,41 @@ namespace Bouncer {
                                 return;
                             }
                             const auto& httpClientTransaction = httpClientTransactionsEntry->second;
+                            if (httpClientTransaction->response.headers.HasHeader("Ratelimit-Remaining")) {
+                                size_t apiPointsRemaining;
+                                if (
+                                    sscanf(
+                                        httpClientTransaction->response.headers.GetHeaderValue("Ratelimit-Remaining").c_str(),
+                                        "%zu",
+                                        &apiPointsRemaining
+                                    ) == 1
+                                ) {
+                                    impl->diagnosticsSender.SendDiagnosticInformationFormatted(
+                                        0,
+                                        "Twitch API points remaining: %zu",
+                                        apiPointsRemaining
+                                    );
+                                }
+                            }
+                            if (httpClientTransaction->response.headers.HasHeader("Ratelimit-Reset")) {
+                                size_t rateLimitReset = 0;
+                                if (
+                                    sscanf(
+                                        httpClientTransaction->response.headers.GetHeaderValue("Ratelimit-Reset").c_str(),
+                                        "%zu",
+                                        &rateLimitReset
+                                    ) == 1
+                                ) {
+                                    const auto now = impl->timeKeeper->GetCurrentTime();
+                                    impl->diagnosticsSender.SendDiagnosticInformationFormatted(
+                                        0,
+                                        "Twitch API points will reset in %lg seconds (%zu - %zu)",
+                                        ((double)rateLimitReset - now),
+                                        rateLimitReset,
+                                        (size_t)now
+                                    );
+                                }
+                            }
                             onCompletion(*impl, id, *httpClientTransaction);
                             (void)impl->httpClientTransactions.erase(httpClientTransactionsEntry);
                             if (impl->userLookupsByLogin.IsEmpty()) {
