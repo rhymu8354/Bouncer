@@ -18,25 +18,25 @@
 #include <HttpNetworkTransport/HttpClientNetworkTransport.hpp>
 #include <inttypes.h>
 #include <Json/Value.hpp>
-#include <map>
 #include <math.h>
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <sstream>
 #include <stdio.h>
 #include <stdint.h>
 #include <string>
-#include <thread>
-#include <time.h>
-#include <TlsDecorator/TlsDecorator.hpp>
-#include <Twitch/Messaging.hpp>
-#include <TwitchNetworkTransport/Connection.hpp>
-#include <sstream>
 #include <StringExtensions/StringExtensions.hpp>
 #include <SystemAbstractions/DiagnosticsSender.hpp>
 #include <SystemAbstractions/DiagnosticsStreamReporter.hpp>
 #include <SystemAbstractions/File.hpp>
 #include <SystemAbstractions/NetworkConnection.hpp>
+#include <thread>
+#include <time.h>
+#include <TlsDecorator/TlsDecorator.hpp>
+#include <Twitch/Messaging.hpp>
+#include <TwitchNetworkTransport/Connection.hpp>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -52,7 +52,7 @@ namespace {
 
     std::string InstantiateTemplate(
         const std::string& templateText,
-        const std::map< std::string, std::string >& variables
+        const std::unordered_map< std::string, std::string >& variables
     ) {
         std::ostringstream builder;
         enum class State {
@@ -482,11 +482,11 @@ namespace Bouncer {
          *
          * The keys are unique identifiers.  The values are the transactions.
          */
-        std::map< int, std::shared_ptr< Http::IClient::Transaction > > httpClientTransactions;
+        std::unordered_map< int, std::shared_ptr< Http::IClient::Transaction > > httpClientTransactions;
 
         std::promise< void > loggedOut;
-        std::map< intmax_t, std::queue< MessageAwaitingProcessing > > messagesAwaitingProcessing;
-        std::map< intmax_t, std::queue< WhisperAwaitingProcessing > > whispersAwaitingProcessing;
+        std::unordered_map< intmax_t, std::queue< MessageAwaitingProcessing > > messagesAwaitingProcessing;
+        std::unordered_map< intmax_t, std::queue< WhisperAwaitingProcessing > > whispersAwaitingProcessing;
         std::recursive_mutex mutex;
         double nextApiCallTime = 0.0;
         double nextConfigurationAutoSaveTime = 0.0;
@@ -510,11 +510,11 @@ namespace Bouncer {
         std::string streamTitle;
         SystemAbstractions::DiagnosticsSender::UnsubscribeDelegate unsubscribeLogFileWriter;
         SystemAbstractions::DiagnosticsSender::UnsubscribeDelegate unsubscribeStatusMessages;
-        std::map< std::string, intmax_t > userIdsByLogin;
-        std::map< std::string, double > userJoinsByLogin;
+        std::unordered_map< std::string, intmax_t > userIdsByLogin;
+        std::unordered_map< std::string, double > userJoinsByLogin;
         AsyncData::MultiProducerSingleConsumerQueue< std::string > userLookupsByLogin;
         bool userLookupsPending = false;
-        std::map< intmax_t, User > usersById;
+        std::unordered_map< intmax_t, User > usersById;
         bool viewTimerRunning = false;
         double viewTimerStart = 0.0;
         std::condition_variable wakeDiagnosticsWorker;
@@ -933,7 +933,7 @@ namespace Bouncer {
                             seconds
                         );
                         if (!configuration.newAccountChatterTimeoutExplanation.empty()) {
-                            std::map< std::string, std::string > variables;
+                            std::unordered_map< std::string, std::string > variables;
                             variables["login"] = user.login;
                             variables["name"] = user.name;
                             const auto explanation = InstantiateTemplate(
@@ -1282,10 +1282,10 @@ namespace Bouncer {
                         continue;
                     }
                     double joinTime = 0.0;
-                    auto userLookupsByLoginEntry = userJoinsByLogin.find(login);
-                    if (userLookupsByLoginEntry != userJoinsByLogin.end()) {
-                        joinTime = userLookupsByLoginEntry->second;
-                        (void)userJoinsByLogin.erase(userLookupsByLoginEntry);
+                    auto userJoinsByLoginEntry = userJoinsByLogin.find(login);
+                    if (userJoinsByLoginEntry != userJoinsByLogin.end()) {
+                        joinTime = userJoinsByLoginEntry->second;
+                        (void)userJoinsByLogin.erase(userJoinsByLoginEntry);
                     }
                     userIdsByLogin[login] = userid;
                     auto& user = usersById[userid];
