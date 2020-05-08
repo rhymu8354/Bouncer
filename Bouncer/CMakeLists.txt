@@ -11,12 +11,16 @@ set(Headers
     include/Bouncer/Main.hpp
     include/Bouncer/Stats.hpp
     include/Bouncer/User.hpp
+    include/Bouncer/UserStore.hpp
+    include/Bouncer/UsersStore.hpp
 )
 
 set(Sources
     src/Main.cpp
     src/TimeKeeper.cpp
     src/TimeKeeper.hpp
+    src/UserStore.cpp
+    src/UsersStore.cpp
 )
 
 add_library(${This} STATIC ${Sources} ${Headers})
@@ -32,6 +36,7 @@ target_link_libraries(${This} PUBLIC
     HttpNetworkTransport
     Json
     StringExtensions
+    SQLite
     SystemAbstractions
     TlsDecorator
     Twitch

@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <AsyncData/MultiProducerSingleConsumerQueue.hpp>
 #include <Bouncer/Main.hpp>
+#include <Bouncer/UsersStore.hpp>
 #include <condition_variable>
 #include <functional>
 #include <future>
@@ -43,7 +44,7 @@ namespace {
 
     constexpr double configurationAutoSaveCooldown = 60.0;
     const auto configurationFilePath = SystemAbstractions::File::GetExeParentDirectory() + "/Bouncer.json";
-    constexpr size_t maxUserChatLines = 10;
+    const auto usersStoreFilePath = SystemAbstractions::File::GetExeParentDirectory() + "/users.db";
     constexpr int maxTimeoutSeconds = 1209600;
     constexpr size_t maxTwitchUserLookupsByLogin = 100;
     constexpr double reconnectCooldown = 5.0;
@@ -510,11 +511,9 @@ namespace Bouncer {
         std::string streamTitle;
         SystemAbstractions::DiagnosticsSender::UnsubscribeDelegate unsubscribeLogFileWriter;
         SystemAbstractions::DiagnosticsSender::UnsubscribeDelegate unsubscribeStatusMessages;
-        std::unordered_map< std::string, intmax_t > userIdsByLogin;
         std::unordered_map< std::string, double > userJoinsByLogin;
         AsyncData::MultiProducerSingleConsumerQueue< std::string > userLookupsByLogin;
         bool userLookupsPending = false;
-        std::unordered_map< intmax_t, User > usersById;
         bool viewTimerRunning = false;
         double viewTimerStart = 0.0;
         std::condition_variable wakeDiagnosticsWorker;
@@ -538,6 +537,11 @@ namespace Bouncer {
          * This is used to track time for the Twitch interface.
          */
         std::shared_ptr< TimeKeeper > timeKeeper = std::make_shared< TimeKeeper >();
+
+        /**
+         * This is used to manage user data.
+         */
+        std::shared_ptr< UsersStore > users = std::make_shared< UsersStore >(usersStoreFilePath);
 
         // Methods
 
@@ -646,64 +650,10 @@ namespace Bouncer {
             configuration.autoBanForbiddenWords = (bool)json["autoBanForbiddenWords"];
             stats.maxViewerCount = (size_t)json["maxViewerCount"];
             stats.totalViewTimeRecorded = (double)json["totalViewTimeRecorded"];
-            const auto& users = json["users"];
-            userIdsByLogin.clear();
             userJoinsByLogin.clear();
-            usersById.clear();
-            const auto numUsers = users.GetSize();
-            for (size_t i = 0; i < numUsers; ++i) {
-                const auto& userEncoded = users[i];
-                const auto userid = (intmax_t)(size_t)userEncoded["id"];
-                auto& user = usersById[userid];
-                user.id = userid;
-                user.login = (std::string)userEncoded["login"];
-                user.name = (std::string)userEncoded["name"];
-                user.createdAt = (double)userEncoded["createdAt"];
-                user.totalViewTime = (double)userEncoded["totalViewTime"];
-                user.firstSeenTime = (double)userEncoded["firstSeenTime"];
-                user.firstMessageTime = (double)userEncoded["firstMessageTime"];
-                user.lastMessageTime = (double)userEncoded["lastMessageTime"];
-                user.numMessages = (size_t)userEncoded["numMessages"];
-                user.timeout = (double)userEncoded["timeout"];
-                user.isBanned = (bool)userEncoded["isBanned"];
-                user.isWhitelisted = (bool)userEncoded["isWhitelisted"];
-                user.watching = (bool)userEncoded["watching"];
-                user.note = (std::string)userEncoded["note"];
-                if (userEncoded.Has("bot")) {
-                    const auto bot = (std::string)userEncoded["bot"];
-                    if (bot == "yes") {
-                        user.bot = User::Bot::Yes;
-                    } else if (bot == "no") {
-                        user.bot = User::Bot::No;
-                    }
-                }
-                if (userEncoded.Has("role")) {
-                    const auto role = (std::string)userEncoded["role"];
-                    if (role == "staff") {
-                        user.role = User::Role::Staff;
-                        user.isWhitelisted = true;
-                    } else if (role == "admin") {
-                        user.role = User::Role::Admin;
-                        user.isWhitelisted = true;
-                    } else if (role == "broadcaster") {
-                        user.role = User::Role::Broadcaster;
-                        user.isWhitelisted = true;
-                    } else if (role == "moderator") {
-                        user.role = User::Role::Moderator;
-                        user.isWhitelisted = true;
-                    } else if (role == "vip") {
-                        user.role = User::Role::VIP;
-                        user.isWhitelisted = true;
-                    } else if (role == "pleb") {
-                        user.role = User::Role::Pleb;
-                    }
-                }
-                const auto& lastChat = userEncoded["lastChat"];
-                const auto numLastChatLines = lastChat.GetSize();
-                for (size_t j = 0; j < numLastChatLines; ++j) {
-                    user.lastChat.push_back((std::string)lastChat[j]);
-                }
-                userIdsByLogin[user.login] = userid;
+            if (json.Has("users")) {
+                users->Migrate(json["users"]);
+                SaveConfiguration();
             }
             const auto& forbiddenWords = json["forbiddenWords"];
             const auto numForbiddenWords = forbiddenWords.GetSize();
@@ -736,8 +686,27 @@ namespace Bouncer {
             ) {
                 return;
             }
-            auto usersByIdEntry = usersById.find(targetUserId);
-            if (usersByIdEntry == usersById.end()) {
+            auto user = users->FindById(targetUserId);
+            if (user) {
+                if (clearInfo.type == Twitch::Messaging::ClearInfo::Type::Ban) {
+                    diagnosticsSender.SendDiagnosticInformationFormatted(
+                        3,
+                        "Twitch user %" PRIdMAX " (%s) has been banned",
+                        targetUserId,
+                        clearInfo.user.c_str()
+                    );
+                    user->SetIsBanned(true);
+                } else {
+                    diagnosticsSender.SendDiagnosticInformationFormatted(
+                        3,
+                        "Twitch user %" PRIdMAX " (%s) has been timed out for %zu seconds",
+                        targetUserId,
+                        clearInfo.user.c_str(),
+                        clearInfo.duration
+                    );
+                    user->SetTimeout(clearTime + clearInfo.duration);
+                }
+            } else {
                 LookupUserById(
                     targetUserId,
                     [
@@ -749,26 +718,6 @@ namespace Bouncer {
                         impl.HandleClear(std::move(clearInfoCopy), clearTime);
                     }
                 );
-            } else {
-                auto& user = usersByIdEntry->second;
-                if (clearInfo.type == Twitch::Messaging::ClearInfo::Type::Ban) {
-                    diagnosticsSender.SendDiagnosticInformationFormatted(
-                        3,
-                        "Twitch user %" PRIdMAX " (%s) has been banned",
-                        targetUserId,
-                        clearInfo.user.c_str()
-                    );
-                    user.isBanned = true;
-                } else {
-                    diagnosticsSender.SendDiagnosticInformationFormatted(
-                        3,
-                        "Twitch user %" PRIdMAX " (%s) has been timed out for %zu seconds",
-                        targetUserId,
-                        clearInfo.user.c_str(),
-                        clearInfo.duration
-                    );
-                    user.timeout = clearTime + clearInfo.duration;
-                }
             }
         }
 
@@ -808,8 +757,179 @@ namespace Bouncer {
         ) {
             const auto userid = messageInfo.tags.userId;
             if (userid != 0) {
-                auto usersByIdEntry = usersById.find(userid);
-                if (usersByIdEntry == usersById.end()) {
+                auto user = users->FindById(userid);
+                if (user) {
+                    UpdateLoginAndName(user, messageInfo.user, messageInfo.tags);
+                    user->SetLastMessageTime(messageTime);
+                    if (
+                        (user->numMessagesThisInstance == 0)
+                        && (user->GetBot() != User::Bot::Yes)
+                        && (user->GetLogin() != configuration.channel)
+                    ) {
+                        user->needsGreeting = true;
+                    }
+                    user->IncrementNumMessages();
+                    ++user->numMessagesThisInstance;
+                    UserSeen(user, messageTime);
+                    if (user->GetFirstMessageTime() == 0.0) {
+                        user->SetFirstMessageTime(messageTime);
+                    }
+                    if (user->firstMessageTimeThisInstance == 0.0) {
+                        user->firstMessageTimeThisInstance = messageTime;
+                    }
+                    UpdateRole(user, messageInfo.tags.badges);
+                    user->AddLastChat(
+                        StringExtensions::sprintf(
+                            "%06zu - %s - %s",
+                            user->GetNumMessages(),
+                            FormatDateTime(messageTime).c_str(),
+                            messageInfo.messageContent.c_str()
+                        )
+                    );
+                    if (configuration.minDiagnosticsLevel <= 3) {
+                        if (messageInfo.isAction) {
+                            QueueStatus(
+                                3,
+                                StringExtensions::sprintf(
+                                    "[%s] %s %s",
+                                    FormatTime(messageTime).c_str(),
+                                    user->GetLogin().c_str(),
+                                    messageInfo.messageContent.c_str()
+                                ),
+                                userid
+                            );
+                        } else {
+                            QueueStatus(
+                                3,
+                                StringExtensions::sprintf(
+                                    "[%s] %s: %s",
+                                    FormatTime(messageTime).c_str(),
+                                    user->GetLogin().c_str(),
+                                    messageInfo.messageContent.c_str()
+                                ),
+                                userid
+                            );
+                        }
+                    }
+                    if (
+                        (user->GetRole() == User::Role::Broadcaster)
+                        && !configuration.greetingPattern.empty()
+                    ) {
+                        const auto greetingPatternLength = configuration.greetingPattern.length();
+                        if (
+                            messageInfo.messageContent.substr(0, greetingPatternLength)
+                            == configuration.greetingPattern
+                        ) {
+                            const auto target = StringExtensions::Trim(
+                                messageInfo.messageContent.substr(greetingPatternLength)
+                            );
+                            const auto greetedUser = users->FindByLogin(target);
+                            if (greetedUser) {
+                                diagnosticsSender.SendDiagnosticInformationFormatted(
+                                    2,
+                                    "Broadcaster greeted user %" PRIdMAX " (%s)",
+                                    userid,
+                                    greetedUser->GetLogin().c_str()
+                                );
+                                greetedUser->needsGreeting = false;
+                            }
+                        }
+                    }
+                    if (
+                        configuration.autoTimeOutNewAccountChatters
+                        && (user->GetRole() == User::Role::Pleb)
+                        && !user->GetIsWhitelisted()
+                        && (messageTime - user->GetCreatedAt() < configuration.newAccountAgeThreshold)
+                    ) {
+                        user->needsGreeting = false;
+                        const auto seconds = std::min(
+                            (int)ceil(
+                                configuration.newAccountAgeThreshold
+                                - (user->GetCreatedAt() - messageTime)
+                            ),
+                            maxTimeoutSeconds
+                        );
+                        diagnosticsSender.SendDiagnosticInformationFormatted(
+                            3,
+                            "New account chatter %" PRIdMAX " (%s) -- timing out user for %d seconds",
+                            user->GetId(),
+                            user->GetLogin().c_str(),
+                            seconds
+                        );
+                        if (!configuration.newAccountChatterTimeoutExplanation.empty()) {
+                            std::unordered_map< std::string, std::string > variables;
+                            variables["login"] = user->GetLogin();
+                            variables["name"] = user->GetName();
+                            const auto explanation = InstantiateTemplate(
+                                configuration.newAccountChatterTimeoutExplanation,
+                                variables
+                            );
+                            tmi.SendWhisper(
+                                user->GetLogin(),
+                                explanation
+                            );
+                        }
+                        tmi.SendMessage(
+                            configuration.channel,
+                            StringExtensions::sprintf(
+                                "/timeout %s %d",
+                                user->GetLogin().c_str(),
+                                seconds
+                            )
+                        );
+                    }
+                    if (
+                        configuration.autoBanTitleScammers
+                        && !streamTitle.empty()
+                        && (user->GetRole() == User::Role::Pleb)
+                        && !user->GetIsWhitelisted()
+                        && (messageInfo.messageContent.find(streamTitle) != std::string::npos)
+                    ) {
+                        user->needsGreeting = false;
+                        diagnosticsSender.SendDiagnosticInformationFormatted(
+                            3,
+                            "Low-effort spam bot %" PRIdMAX " (%s) detected -- applying ban hammer",
+                            user->GetId(),
+                            user->GetLogin().c_str()
+                        );
+                        tmi.SendMessage(
+                            configuration.channel,
+                            StringExtensions::sprintf(
+                                "/ban %s",
+                                user->GetLogin().c_str()
+                            )
+                        );
+                    }
+                    if (
+                        configuration.autoBanForbiddenWords
+                        && (user->GetRole() == User::Role::Pleb)
+                        && !user->GetIsWhitelisted()
+                    ) {
+                        std::string forbiddenWordFound;
+                        for (const auto& forbiddenWord: configuration.forbiddenWords) {
+                            if (messageInfo.messageContent.find(forbiddenWord) != std::string::npos) {
+                                forbiddenWordFound = forbiddenWord;
+                                break;
+                            }
+                        }
+                        if (!forbiddenWordFound.empty()) {
+                            diagnosticsSender.SendDiagnosticInformationFormatted(
+                                3,
+                                "Forbiden word '%s' spoken by user %" PRIdMAX " (%s) -- applying ban hammer",
+                                forbiddenWordFound.c_str(),
+                                user->GetId(),
+                                user->GetLogin().c_str()
+                            );
+                            tmi.SendMessage(
+                                configuration.channel,
+                                StringExtensions::sprintf(
+                                    "/ban %s",
+                                    user->GetLogin().c_str()
+                                )
+                            );
+                        }
+                    }
+                } else {
                     auto& messagesAwaitingProcessingForUser = messagesAwaitingProcessing[userid];
                     const auto noMessagesOrWhispersWereAlreadyAwaitingProcessing = (
                         messagesAwaitingProcessingForUser.empty()
@@ -825,186 +945,6 @@ namespace Bouncer {
                             std::bind(&Impl::ProcessMessagesAndWhispersAwaitingProcessing, this, userid)
                         );
                     }
-                } else {
-                    auto& user = usersByIdEntry->second;
-                    UpdateLoginAndName(user, messageInfo.user, messageInfo.tags);
-                    user.lastMessageTime = messageTime;
-                    if (
-                        (user.numMessagesThisInstance == 0)
-                        && (user.bot != User::Bot::Yes)
-                        && (user.login != configuration.channel)
-                    ) {
-                        user.needsGreeting = true;
-                    }
-                    ++user.numMessages;
-                    ++user.numMessagesThisInstance;
-                    UserSeen(user, messageTime);
-                    if (user.firstMessageTime == 0.0) {
-                        user.firstMessageTime = messageTime;
-                    }
-                    if (user.firstMessageTimeThisInstance == 0.0) {
-                        user.firstMessageTimeThisInstance = messageTime;
-                    }
-                    UpdateRole(user, messageInfo.tags.badges);
-                    user.lastChat.push_back(
-                        StringExtensions::sprintf(
-                            "%06zu - %s - %s",
-                            user.numMessages,
-                            FormatDateTime(messageTime).c_str(),
-                            messageInfo.messageContent.c_str()
-                        )
-                    );
-                    while (user.lastChat.size() > maxUserChatLines) {
-                        user.lastChat.erase(user.lastChat.begin());
-                    }
-                    if (configuration.minDiagnosticsLevel <= 3) {
-                        if (messageInfo.isAction) {
-                            QueueStatus(
-                                3,
-                                StringExtensions::sprintf(
-                                    "[%s] %s %s",
-                                    FormatTime(messageTime).c_str(),
-                                    user.login.c_str(),
-                                    messageInfo.messageContent.c_str()
-                                ),
-                                userid
-                            );
-                        } else {
-                            QueueStatus(
-                                3,
-                                StringExtensions::sprintf(
-                                    "[%s] %s: %s",
-                                    FormatTime(messageTime).c_str(),
-                                    user.login.c_str(),
-                                    messageInfo.messageContent.c_str()
-                                ),
-                                userid
-                            );
-                        }
-                    }
-                    if (
-                        (user.role == User::Role::Broadcaster)
-                        && !configuration.greetingPattern.empty()
-                    ) {
-                        const auto greetingPatternLength = configuration.greetingPattern.length();
-                        if (
-                            messageInfo.messageContent.substr(0, greetingPatternLength)
-                            == configuration.greetingPattern
-                        ) {
-                            const auto target = StringExtensions::Trim(
-                                messageInfo.messageContent.substr(greetingPatternLength)
-                            );
-                            const auto userIdsByLoginEntry = userIdsByLogin.find(target);
-                            if (userIdsByLoginEntry != userIdsByLogin.end()) {
-                                const auto userid = userIdsByLoginEntry->second;
-                                auto usersByIdEntry = usersById.find(userid);
-                                if (usersByIdEntry != usersById.end()) {
-                                    auto& user = usersByIdEntry->second;
-                                    diagnosticsSender.SendDiagnosticInformationFormatted(
-                                        2,
-                                        "Broadcaster greeted user %" PRIdMAX " (%s)",
-                                        userid,
-                                        user.login.c_str()
-                                    );
-                                    user.needsGreeting = false;
-                                }
-                            }
-                        }
-                    }
-                    if (
-                        configuration.autoTimeOutNewAccountChatters
-                        && (user.role == User::Role::Pleb)
-                        && !user.isWhitelisted
-                        && (messageTime - user.createdAt < configuration.newAccountAgeThreshold)
-                    ) {
-                        user.needsGreeting = false;
-                        const auto seconds = std::min(
-                            (int)ceil(
-                                configuration.newAccountAgeThreshold
-                                - (user.createdAt - messageTime)
-                            ),
-                            maxTimeoutSeconds
-                        );
-                        diagnosticsSender.SendDiagnosticInformationFormatted(
-                            3,
-                            "New account chatter %" PRIdMAX " (%s) -- timing out user for %d seconds",
-                            user.id,
-                            user.login.c_str(),
-                            seconds
-                        );
-                        if (!configuration.newAccountChatterTimeoutExplanation.empty()) {
-                            std::unordered_map< std::string, std::string > variables;
-                            variables["login"] = user.login;
-                            variables["name"] = user.name;
-                            const auto explanation = InstantiateTemplate(
-                                configuration.newAccountChatterTimeoutExplanation,
-                                variables
-                            );
-                            tmi.SendWhisper(
-                                user.login,
-                                explanation
-                            );
-                        }
-                        tmi.SendMessage(
-                            configuration.channel,
-                            StringExtensions::sprintf(
-                                "/timeout %s %d",
-                                user.login.c_str(),
-                                seconds
-                            )
-                        );
-                    }
-                    if (
-                        configuration.autoBanTitleScammers
-                        && !streamTitle.empty()
-                        && (user.role == User::Role::Pleb)
-                        && !user.isWhitelisted
-                        && (messageInfo.messageContent.find(streamTitle) != std::string::npos)
-                    ) {
-                        user.needsGreeting = false;
-                        diagnosticsSender.SendDiagnosticInformationFormatted(
-                            3,
-                            "Low-effort spam bot %" PRIdMAX " (%s) detected -- applying ban hammer",
-                            user.id,
-                            user.login.c_str()
-                        );
-                        tmi.SendMessage(
-                            configuration.channel,
-                            StringExtensions::sprintf(
-                                "/ban %s",
-                                user.login.c_str()
-                            )
-                        );
-                    }
-                    if (
-                        configuration.autoBanForbiddenWords
-                        && (user.role == User::Role::Pleb)
-                        && !user.isWhitelisted
-                    ) {
-                        std::string forbiddenWordFound;
-                        for (const auto& forbiddenWord: configuration.forbiddenWords) {
-                            if (messageInfo.messageContent.find(forbiddenWord) != std::string::npos) {
-                                forbiddenWordFound = forbiddenWord;
-                                break;
-                            }
-                        }
-                        if (!forbiddenWordFound.empty()) {
-                            diagnosticsSender.SendDiagnosticInformationFormatted(
-                                3,
-                                "Forbiden word '%s' spoken by user %" PRIdMAX " (%s) -- applying ban hammer",
-                                forbiddenWordFound.c_str(),
-                                user.id,
-                                user.login.c_str()
-                            );
-                            tmi.SendMessage(
-                                configuration.channel,
-                                StringExtensions::sprintf(
-                                    "/ban %s",
-                                    user.login.c_str()
-                                )
-                            );
-                        }
-                    }
                 }
             }
         }
@@ -1015,8 +955,23 @@ namespace Bouncer {
         ) {
             const auto userid = whisperInfo.tags.userId;
             if (userid != 0) {
-                auto usersByIdEntry = usersById.find(userid);
-                if (usersByIdEntry == usersById.end()) {
+                auto user = users->FindById(userid);
+                if (user) {
+                    UpdateLoginAndName(user, whisperInfo.user, whisperInfo.tags);
+                    UserSeen(user, messageTime);
+                    if (configuration.minDiagnosticsLevel <= 3) {
+                        QueueStatus(
+                            3,
+                            StringExtensions::sprintf(
+                                "[%s] %s whispered: %s",
+                                FormatTime(messageTime).c_str(),
+                                user->GetLogin().c_str(),
+                                whisperInfo.message.c_str()
+                            ),
+                            userid
+                        );
+                    }
+                } else {
                     auto& whispersAwaitingProcessingForUser = whispersAwaitingProcessing[userid];
                     const auto noMessagesOrWhispersWereAlreadyAwaitingProcessing = (
                         whispersAwaitingProcessingForUser.empty()
@@ -1030,22 +985,6 @@ namespace Bouncer {
                         LookupUserById(
                             userid,
                             std::bind(&Impl::ProcessMessagesAndWhispersAwaitingProcessing, this, userid)
-                        );
-                    }
-                } else {
-                    auto& user = usersByIdEntry->second;
-                    UpdateLoginAndName(user, whisperInfo.user, whisperInfo.tags);
-                    UserSeen(user, messageTime);
-                    if (configuration.minDiagnosticsLevel <= 3) {
-                        QueueStatus(
-                            3,
-                            StringExtensions::sprintf(
-                                "[%s] %s whispered: %s",
-                                FormatTime(messageTime).c_str(),
-                                user.login.c_str(),
-                                whisperInfo.message.c_str()
-                            ),
-                            userid
                         );
                     }
                 }
@@ -1073,45 +1012,12 @@ namespace Bouncer {
                 ){
                     if (transaction.response.statusCode == 200) {
                         const auto userEncoded = Json::Value::FromEncoding(transaction.response.body);
-                        const auto login = (std::string)userEncoded["name"];
-                        if (login.empty()) {
-                            impl.diagnosticsSender.SendDiagnosticInformationFormatted(
-                                SystemAbstractions::DiagnosticsSender::Levels::WARNING,
-                                "Twitch API call %d returned user with missing login",
-                                id
-                            );
-                            return;
-                        }
-                        impl.userIdsByLogin[login] = userid;
-                        auto& user = impl.usersById[userid];
+                        User user;
                         user.id = userid;
-                        if (user.login != login) {
-                            if (!user.login.empty()) {
-                                impl.diagnosticsSender.SendDiagnosticInformationFormatted(
-                                    3,
-                                    "Twitch user %" PRIdMAX " login changed from %s to %s",
-                                    userid,
-                                    user.login.c_str(),
-                                    login.c_str()
-                                );
-                                (void)impl.userIdsByLogin.erase(user.login);
-                            }
-                            user.login = login;
-                        }
-                        const auto name = (std::string)userEncoded["display_name"];
-                        if (user.name != name) {
-                            if (!user.name.empty()) {
-                                impl.diagnosticsSender.SendDiagnosticInformationFormatted(
-                                    3,
-                                    "Twitch user %" PRIdMAX " display name changed from %s to %s",
-                                    userid,
-                                    user.name.c_str(),
-                                    name.c_str()
-                                );
-                            }
-                            user.name = name;
-                        }
+                        user.login = (std::string)userEncoded["name"];
+                        user.name = (std::string)userEncoded["display_name"];
                         user.createdAt = ParseTimestamp((std::string)userEncoded["created_at"]);
+                        impl.users->Add(user);
                         after(impl);
                     } else {
                         impl.diagnosticsSender.SendDiagnosticInformationFormatted(
@@ -1198,16 +1104,15 @@ namespace Bouncer {
                 state = State::OutsideRoom;
                 stats.currentViewerCount = 0;
             } else {
-                const auto userIdsByLoginEntry = userIdsByLogin.find(membershipInfo.user);
-                if (userIdsByLoginEntry != userIdsByLogin.end()) {
-                    const auto userid = userIdsByLoginEntry->second;
-                    auto& user = usersById[userid];
-                    if (user.isJoined) {
-                        UserParted(
-                            userid,
-                            timeKeeper->GetCurrentTime()
-                        );
-                    }
+                auto user = users->FindByLogin(membershipInfo.user);
+                if (
+                    user
+                    && user->isJoined
+                ) {
+                    UserParted(
+                        user,
+                        timeKeeper->GetCurrentTime()
+                    );
                 }
             }
         }
@@ -1253,9 +1158,9 @@ namespace Bouncer {
             std::function< void(Impl& impl) > after
         ) {
             if (response.statusCode == 200) {
-                const auto users = Json::Value::FromEncoding(response.body)["users"];
-                for (size_t i = 0; i < users.GetSize(); ++i) {
-                    const auto& userEncoded = users[i];
+                const auto usersEncoded = Json::Value::FromEncoding(response.body)["users"];
+                for (size_t i = 0; i < usersEncoded.GetSize(); ++i) {
+                    const auto& userEncoded = usersEncoded[i];
                     intmax_t userid;
                     if (
                         sscanf(
@@ -1287,39 +1192,25 @@ namespace Bouncer {
                         joinTime = userJoinsByLoginEntry->second;
                         (void)userJoinsByLogin.erase(userJoinsByLoginEntry);
                     }
-                    userIdsByLogin[login] = userid;
-                    auto& user = usersById[userid];
-                    user.id = userid;
-                    if (user.login != login) {
-                        if (!user.login.empty()) {
-                            diagnosticsSender.SendDiagnosticInformationFormatted(
-                                3,
-                                "Twitch user %" PRIdMAX " login changed from %s to %s",
-                                userid,
-                                user.login.c_str(),
-                                login.c_str()
-                            );
-                            (void)userIdsByLogin.erase(user.login);
-                        }
-                        user.login = login;
-                    }
+                    users->SetUserId(login, userid);
+                    auto user = users->FindById(userid);
                     const auto name = (std::string)userEncoded["display_name"];
-                    if (user.name != name) {
-                        if (!user.name.empty()) {
+                    if (user->GetName() != name) {
+                        if (!user->GetName().empty()) {
                             diagnosticsSender.SendDiagnosticInformationFormatted(
                                 3,
                                 "Twitch user %" PRIdMAX " display name changed from %s to %s",
                                 userid,
-                                user.name.c_str(),
+                                user->GetName().c_str(),
                                 name.c_str()
                             );
                         }
-                        user.name = name;
+                        user->SetName(name);
                     }
-                    user.createdAt = ParseTimestamp((std::string)userEncoded["created_at"]);
+                    user->SetCreatedAt(ParseTimestamp((std::string)userEncoded["created_at"]));
                     if (joinTime != 0.0) {
                         UserSeen(user, joinTime);
-                        UserJoined(userid, joinTime);
+                        UserJoined(user, joinTime);
                     }
                 }
                 after(*this);
@@ -1547,15 +1438,15 @@ namespace Bouncer {
         }
 
         void QueryChannelStats() {
-            const auto userIdsByLoginEntry = userIdsByLogin.find(configuration.channel);
-            if (userIdsByLoginEntry == userIdsByLogin.end()) {
+            const auto user = users->FindByLogin(configuration.channel);
+            if (!user) {
                 LookupUserByName(
                     configuration.channel,
                     [](Impl& impl){ impl.QueryChannelStats(); }
                 );
                 return;
             }
-            const auto channelId = userIdsByLoginEntry->second;
+            const auto channelId = user->GetId();
             PostApiCall(
                 StringExtensions::sprintf(
                     "https://api.twitch.tv/kraken/channels/%" PRIdMAX,
@@ -1613,82 +1504,81 @@ namespace Bouncer {
                 {"autoTimeOutNewAccountChatters", configuration.autoTimeOutNewAccountChatters},
                 {"autoBanTitleScammers", configuration.autoBanTitleScammers},
                 {"autoBanForbiddenWords", configuration.autoBanForbiddenWords},
-                {"users", Json::Array({})},
                 {"maxViewerCount", stats.maxViewerCount},
                 {"totalViewTimeRecorded", totalViewTimeRecorded},
                 {"forbiddenWords", Json::Array({})},
             });
-            auto& users = json["users"];
-            for (const auto& usersByIdEntry: usersById) {
-                const auto& user = usersByIdEntry.second;
-                auto totalViewTime = user.totalViewTime;
-                if (
-                    viewTimerRunning
-                    && user.isJoined
-                ) {
-                    totalViewTime += (now - user.joinTime);
-                }
-                auto userEncoded = Json::Object({
-                    {"id", (size_t)usersByIdEntry.first},
-                    {"login", user.login},
-                    {"name", user.name},
-                    {"createdAt", user.createdAt},
-                    {"totalViewTime", totalViewTime},
-                    {"firstSeenTime", user.firstSeenTime},
-                    {"firstMessageTime", user.firstMessageTime},
-                    {"lastMessageTime", user.lastMessageTime},
-                    {"numMessages", user.numMessages},
-                    {"timeout", user.timeout},
-                    {"isBanned", user.isBanned},
-                    {"isWhitelisted", user.isWhitelisted},
-                    {"watching", user.watching},
-                    {"note", user.note},
-                    {"lastChat", Json::Array({})},
-                });
-                switch (user.bot) {
-                    case User::Bot::Yes: {
-                        userEncoded["bot"] = "yes";
-                    } break;
+            //auto& users = json["users"];
+            //for (const auto& usersByIdEntry: usersById) {
+            //    const auto& user = usersByIdEntry.second;
+            //    auto totalViewTime = user.totalViewTime;
+            //    if (
+            //        viewTimerRunning
+            //        && user.isJoined
+            //    ) {
+            //        totalViewTime += (now - user.joinTime);
+            //    }
+            //    auto userEncoded = Json::Object({
+            //        {"id", (size_t)usersByIdEntry.first},
+            //        {"login", user.login},
+            //        {"name", user.name},
+            //        {"createdAt", user.createdAt},
+            //        {"totalViewTime", totalViewTime},
+            //        {"firstSeenTime", user.firstSeenTime},
+            //        {"firstMessageTime", user.firstMessageTime},
+            //        {"lastMessageTime", user.lastMessageTime},
+            //        {"numMessages", user.numMessages},
+            //        {"timeout", user.timeout},
+            //        {"isBanned", user.isBanned},
+            //        {"isWhitelisted", user.isWhitelisted},
+            //        {"watching", user.watching},
+            //        {"note", user.note},
+            //        {"lastChat", Json::Array({})},
+            //    });
+            //    switch (user.bot) {
+            //        case User::Bot::Yes: {
+            //            userEncoded["bot"] = "yes";
+            //        } break;
 
-                    case User::Bot::No: {
-                        userEncoded["bot"] = "no";
-                    } break;
+            //        case User::Bot::No: {
+            //            userEncoded["bot"] = "no";
+            //        } break;
 
-                    default: break;
-                }
-                switch (user.role) {
-                    case User::Role::Staff: {
-                        userEncoded["role"] = "staff";
-                    } break;
+            //        default: break;
+            //    }
+            //    switch (user.role) {
+            //        case User::Role::Staff: {
+            //            userEncoded["role"] = "staff";
+            //        } break;
 
-                    case User::Role::Admin: {
-                        userEncoded["role"] = "admin";
-                    } break;
+            //        case User::Role::Admin: {
+            //            userEncoded["role"] = "admin";
+            //        } break;
 
-                    case User::Role::Broadcaster: {
-                        userEncoded["role"] = "broadcaster";
-                    } break;
+            //        case User::Role::Broadcaster: {
+            //            userEncoded["role"] = "broadcaster";
+            //        } break;
 
-                    case User::Role::Moderator: {
-                        userEncoded["role"] = "moderator";
-                    } break;
+            //        case User::Role::Moderator: {
+            //            userEncoded["role"] = "moderator";
+            //        } break;
 
-                    case User::Role::VIP: {
-                        userEncoded["role"] = "vip";
-                    } break;
+            //        case User::Role::VIP: {
+            //            userEncoded["role"] = "vip";
+            //        } break;
 
-                    case User::Role::Pleb: {
-                        userEncoded["role"] = "pleb";
-                    } break;
+            //        case User::Role::Pleb: {
+            //            userEncoded["role"] = "pleb";
+            //        } break;
 
-                    default: break;
-                }
-                auto& lastChat = userEncoded["lastChat"];
-                for (const auto& line: user.lastChat) {
-                    lastChat.Add(line);
-                }
-                users.Add(std::move(userEncoded));
-            }
+            //        default: break;
+            //    }
+            //    auto& lastChat = userEncoded["lastChat"];
+            //    for (const auto& line: user.lastChat) {
+            //        lastChat.Add(line);
+            //    }
+            //    users.Add(std::move(userEncoded));
+            //}
             auto& forbiddenWords = json["forbiddenWords"];
             for (const auto& forbiddenWord: configuration.forbiddenWords) {
                 forbiddenWords.Add(forbiddenWord);
@@ -1805,134 +1695,129 @@ namespace Bouncer {
         }
 
         void UpdateRole(
-            User& user,
+            std::shared_ptr< UserStore >& user,
             const std::set< std::string >& badges
         ) {
-            user.role = User::Role::Pleb;
+            const auto setWhitelistedRole = [&](User::Role role) {
+                user->SetRole(role);
+                user->SetIsWhitelisted(true);
+            };
             for (const auto& badge: badges) {
                 const auto badgeParts = StringExtensions::Split(badge, '/');
                 if (badgeParts.size() >= 1) {
                     if (badgeParts[0] == "vip") {
-                        user.role = User::Role::VIP;
-                        user.isWhitelisted = true;
+                        setWhitelistedRole(User::Role::VIP);
                         return;
                     } else if (badgeParts[0] == "moderator") {
-                        user.role = User::Role::Moderator;
-                        user.isWhitelisted = true;
+                        setWhitelistedRole(User::Role::Moderator);
                         return;
                     } else if (badgeParts[0] == "broadcaster") {
-                        user.role = User::Role::Broadcaster;
-                        user.isWhitelisted = true;
+                        setWhitelistedRole(User::Role::Broadcaster);
                         return;
                     } else if (badgeParts[0] == "admin") {
-                        user.role = User::Role::Admin;
-                        user.isWhitelisted = true;
+                        setWhitelistedRole(User::Role::Admin);
                         return;
                     } else if (badgeParts[0] == "staff") {
-                        user.role = User::Role::Staff;
-                        user.isWhitelisted = true;
+                        setWhitelistedRole(User::Role::Staff);
                         return;
                     }
                 }
             }
+            user->SetRole(User::Role::Pleb);
         }
 
         void UpdateLoginAndName(
-            User& user,
+            std::shared_ptr< UserStore >& user,
             const std::string& login,
             const Twitch::Messaging::TagsInfo& tags
         ) {
-            if (user.login != login) {
-                if (!user.login.empty()) {
+            if (user->GetLogin() != login) {
+                if (!user->GetLogin().empty()) {
                     diagnosticsSender.SendDiagnosticInformationFormatted(
                         3,
                         "Twitch user %" PRIdMAX " login changed from %s to %s",
-                        user.id,
-                        user.login.c_str(),
+                        user->GetId(),
+                        user->GetLogin().c_str(),
                         login.c_str()
                     );
                     (void)userIdsByLogin.erase(user.login);
                 }
-                user.login = login;
+                user->SetLogin(login);
             }
-            userIdsByLogin[login] = user.id;
-            if (user.name != tags.displayName) {
-                if (!user.name.empty()) {
+            userIdsByLogin[login] = user->GetId();
+            if (user->GetName() != tags.displayName) {
+                if (!user->GetName().empty()) {
                     diagnosticsSender.SendDiagnosticInformationFormatted(
                         3,
                         "Twitch user %" PRIdMAX " display name changed from %s to %s",
-                        user.id,
-                        user.name.c_str(),
+                        user->GetId(),
+                        user->GetName().c_str(),
                         tags.displayName.c_str()
                     );
                 }
-                user.name = tags.displayName;
+                user->SetName(tags.displayName);
             }
         }
 
         void UserParted(
-            intmax_t userid,
+            std::shared_ptr< UserStore >& user,
             double partTime
         ) {
-            auto& user = usersById[userid];
             if (
-                user.isJoined
+                user->isJoined
                 && viewTimerRunning
             ) {
-                user.totalViewTime += (partTime - user.joinTime);
+                user->AddTotalViewTime(partTime - user->joinTime);
             }
             if (
-                user.isJoined
-                && (user.bot != User::Bot::Yes)
+                user->isJoined
+                && (user->GetBot() != User::Bot::Yes)
             ) {
                 ViewerCountDown();
             }
-            user.isJoined = false;
-            user.partTime = partTime;
+            user->isJoined = false;
+            user->partTime = partTime;
             diagnosticsSender.SendDiagnosticInformationFormatted(
                 1,
                 "User %" PRIdMAX " (%s) has parted",
-                userid,
-                user.login.c_str()
+                user->GetId(),
+                user->GetLogin().c_str()
             );
         }
 
         void UserJoined(
-            intmax_t userid,
+            std::shared_ptr< UserStore >& user,
             double joinTime
         ) {
-            auto& user = usersById[userid];
             if (
-                !user.isJoined
-                && (user.bot != User::Bot::Yes)
+                !user->isJoined
+                && (user->GetBot() != User::Bot::Yes)
             ) {
                 ViewerCountUp();
             }
-            user.isJoined = true;
-            user.joinTime = joinTime;
+            user->isJoined = true;
+            user->joinTime = joinTime;
             diagnosticsSender.SendDiagnosticInformationFormatted(
                 1,
                 "User %" PRIdMAX " (%s) has joined (account age: %lf)",
-                userid,
-                user.login.c_str(),
-                timeKeeper->GetCurrentTime() - user.createdAt
+                user->GetId(),
+                user->GetLogin().c_str(),
+                timeKeeper->GetCurrentTime() - user->GetCreatedAt()
             );
         }
 
         void UsersJoined(const std::vector< std::string >& logins) {
             const auto joinTime = timeKeeper->GetCurrentTime();
             for (const auto& login: logins) {
-                auto userIdsByLoginEntry = userIdsByLogin.find(login);
-                if (userIdsByLoginEntry == userIdsByLogin.end()) {
+                auto user = users->FindByLogin(login);
+                if (user) {
+                    UserSeen(user, joinTime);
+                    if (!user->isJoined) {
+                        UserJoined(user, joinTime);
+                    }
+                } else {
                     userLookupsByLogin.Add(login);
                     userJoinsByLogin[login] = joinTime;
-                } else {
-                    const auto userid = userIdsByLoginEntry->second;
-                    auto& user = usersById[userid];
-                    UserSeen(user, joinTime);
-                    if (!user.isJoined) {
-                        UserJoined(userid, joinTime);
-                    }
                 }
             }
             if (
@@ -1945,16 +1830,16 @@ namespace Bouncer {
         }
 
         void UserSeen(
-            User& user,
+            std::shared_ptr< UserStore >& user,
             double time
         ) {
-            if (user.firstSeenTime == 0.0) {
-                user.firstSeenTime = time;
+            if (user->firstSeenTime == 0.0) {
+                user->firstSeenTime = time;
                 diagnosticsSender.SendDiagnosticInformationFormatted(
                     2,
                     "User %" PRIdMAX " (%s) seen for the first time (%lf)",
-                    user.id,
-                    user.login.c_str(),
+                    user->GetId(),
+                    user->GetLogin().c_str(),
                     time
                 );
             }
@@ -1990,13 +1875,17 @@ namespace Bouncer {
         }
 
         void WorkerBody(std::unique_lock< decltype(mutex) >& lock) {
+            const auto diagnosticsPublisher = diagnosticsSender.Chain();
+            users->SubscribeToDiagnostics(diagnosticsPublisher);
+            if (!users->Mobilize(usersStoreFilePath)) {
+                return;
+            }
             LoadConfiguration();
             std::string caCerts;
             const auto caCertsPath = SystemAbstractions::File::GetExeParentDirectory() + "/cert.pem";
             if (!LoadFile(caCertsPath, "CA certificates", diagnosticsSender, caCerts)) {
                 return;
             }
-            const auto diagnosticsPublisher = diagnosticsSender.Chain();
             (void)httpClient->SubscribeToDiagnostics(diagnosticsPublisher);
             Http::Client::MobilizationDependencies httpClientDeps;
             httpClientDeps.timeKeeper = timeKeeper;
@@ -2111,30 +2000,30 @@ namespace Bouncer {
 
     void Main::Ban(intmax_t userid) {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
-        auto usersByIdEntry = impl_->usersById.find(userid);
-        if (usersByIdEntry == impl_->usersById.end()) {
+        auto user = impl_->users->FindById(userid);
+        if (!user) {
             return;
         }
         if (impl_->state != Impl::State::InsideRoom) {
             impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
                 SystemAbstractions::DiagnosticsSender::Levels::WARNING,
                 "Unable to ban user %" PRIdMAX " (%s) because we're not in the room",
-                usersByIdEntry->second.id,
-                usersByIdEntry->second.login.c_str()
+                user->GetId(),
+                user->GetLogin().c_str()
             );
             return;
         }
         impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
             3,
             "Banning user %" PRIdMAX " (%s)",
-            usersByIdEntry->second.id,
-            usersByIdEntry->second.login.c_str()
+            user->GetId(),
+            user->GetLogin().c_str()
         );
         impl_->tmi.SendMessage(
             impl_->configuration.channel,
             StringExtensions::sprintf(
                 "/ban %s",
-                usersByIdEntry->second.login.c_str()
+                user->GetLogin().c_str()
             )
         );
     }
@@ -2194,12 +2083,11 @@ namespace Bouncer {
 
     void Main::MarkGreeted(intmax_t userid) {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
-        auto usersByIdEntry = impl_->usersById.find(userid);
-        if (usersByIdEntry == impl_->usersById.end()) {
+        auto user = impl_->users->FindById(userid);
+        if (!user) {
             return;
         }
-        auto& user = usersByIdEntry->second;
-        user.needsGreeting = false;
+        user->needsGreeting = false;
     }
 
     void Main::QueryChannelStats() {
@@ -2209,25 +2097,24 @@ namespace Bouncer {
 
     void Main::SetBotStatus(intmax_t userid, User::Bot bot) {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
-        auto usersByIdEntry = impl_->usersById.find(userid);
-        if (usersByIdEntry == impl_->usersById.end()) {
+        auto user = impl_->users->FindById(userid);
+        if (!user) {
             return;
         }
-        auto& user = usersByIdEntry->second;
-        if (user.isJoined) {
+        if (user->isJoined) {
             if (
-                (user.bot == User::Bot::Yes)
+                (user->GetBot() == User::Bot::Yes)
                 && (bot != User::Bot::Yes)
             ) {
                 impl_->ViewerCountUp();
             } else if (
-                (user.bot != User::Bot::Yes)
+                (user->GetBot() != User::Bot::Yes)
                 && (bot == User::Bot::Yes)
             ) {
                 impl_->ViewerCountDown();
             }
         }
-        user.bot = bot;
+        user->SetBot(bot);
     }
 
     void Main::SetConfiguration(const Configuration& configuration) {
@@ -2240,11 +2127,11 @@ namespace Bouncer {
 
     void Main::SetNote(intmax_t userid, const std::string& note) {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
-        auto usersByIdEntry = impl_->usersById.find(userid);
-        if (usersByIdEntry == impl_->usersById.end()) {
+        auto user = impl_->users->FindById(userid);
+        if (!user) {
             return;
         }
-        usersByIdEntry->second.note = note;
+        user->SetNote(note);
     }
 
     void Main::StartApplication(std::shared_ptr< Host > host) {
@@ -2291,11 +2178,11 @@ namespace Bouncer {
 
     void Main::StartWatching(intmax_t userid) {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
-        auto usersByIdEntry = impl_->usersById.find(userid);
-        if (usersByIdEntry == impl_->usersById.end()) {
+        auto user = impl_->users->FindById(userid);
+        if (!user) {
             return;
         }
-        usersByIdEntry->second.watching = true;
+        user->SetWatching(true);
     }
 
     void Main::StopViewTimer() {
@@ -2319,40 +2206,40 @@ namespace Bouncer {
 
     void Main::StopWatching(intmax_t userid) {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
-        auto usersByIdEntry = impl_->usersById.find(userid);
-        if (usersByIdEntry == impl_->usersById.end()) {
+        auto user = impl_->users->FindById(userid);
+        if (!user) {
             return;
         }
-        usersByIdEntry->second.watching = false;
+        user->SetWatching(false);
     }
 
     void Main::TimeOut(intmax_t userid, int seconds) {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
-        auto usersByIdEntry = impl_->usersById.find(userid);
-        if (usersByIdEntry == impl_->usersById.end()) {
+        auto user = impl_->users->FindById(userid);
+        if (!user) {
             return;
         }
         if (impl_->state != Impl::State::InsideRoom) {
             impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
                 SystemAbstractions::DiagnosticsSender::Levels::WARNING,
                 "Unable to time out user %" PRIdMAX " (%s) because we're not in the room",
-                usersByIdEntry->second.id,
-                usersByIdEntry->second.login.c_str()
+                user->GetId(),
+                user->GetLogin().c_str()
             );
             return;
         }
         impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
             3,
             "Timing out user %" PRIdMAX " (%s) for %d seconds",
-            usersByIdEntry->second.id,
-            usersByIdEntry->second.login.c_str(),
+            user->GetId(),
+            user->GetLogin().c_str(),
             seconds
         );
         impl_->tmi.SendMessage(
             impl_->configuration.channel,
             StringExtensions::sprintf(
                 "/timeout %s %d",
-                usersByIdEntry->second.login.c_str(),
+                user->GetLogin().c_str(),
                 seconds
             )
         );
@@ -2360,52 +2247,52 @@ namespace Bouncer {
 
     void Main::Unban(intmax_t userid) {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
-        auto usersByIdEntry = impl_->usersById.find(userid);
-        if (usersByIdEntry == impl_->usersById.end()) {
+        auto user = impl_->users->FindById(userid);
+        if (!user) {
             return;
         }
-        usersByIdEntry->second.isBanned = false;
-        usersByIdEntry->second.timeout = 0.0;
+        user->SetIsBanned(false);
+        user->SetTimeout(0.0);
         if (impl_->state != Impl::State::InsideRoom) {
             impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
                 SystemAbstractions::DiagnosticsSender::Levels::WARNING,
                 "Unable to unban user %" PRIdMAX " (%s) because we're not in the room",
-                usersByIdEntry->second.id,
-                usersByIdEntry->second.login.c_str()
+                user->GetId(),
+                user->GetLogin().c_str()
             );
             return;
         }
         impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
             3,
             "Unbanning user %" PRIdMAX " (%s)",
-            usersByIdEntry->second.id,
-            usersByIdEntry->second.login.c_str()
+            user->GetId(),
+            user->GetLogin().c_str()
         );
         impl_->tmi.SendMessage(
             impl_->configuration.channel,
             StringExtensions::sprintf(
                 "/unban %s",
-                usersByIdEntry->second.login.c_str()
+                user->GetLogin().c_str()
             )
         );
     }
 
     void Main::Unwhitelist(intmax_t userid) {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
-        auto usersByIdEntry = impl_->usersById.find(userid);
-        if (usersByIdEntry == impl_->usersById.end()) {
+        auto user = impl_->users->FindById(userid);
+        if (!user) {
             return;
         }
-        usersByIdEntry->second.isWhitelisted = false;
+        user->SetIsWhitelisted(false);
     }
 
     void Main::Whitelist(intmax_t userid) {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
-        auto usersByIdEntry = impl_->usersById.find(userid);
-        if (usersByIdEntry == impl_->usersById.end()) {
+        auto user = impl_->users->FindById(userid);
+        if (!user) {
             return;
         }
-        usersByIdEntry->second.isWhitelisted = true;
+        user->SetIsWhitelisted(true);
     }
 
 }
