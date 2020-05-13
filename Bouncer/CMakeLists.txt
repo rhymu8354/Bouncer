@@ -13,6 +13,7 @@ set(Headers
     include/Bouncer/User.hpp
     include/Bouncer/UserStore.hpp
     include/Bouncer/UsersStore.hpp
+    include/Bouncer/UserStoreContainer.hpp
 )
 
 set(Sources

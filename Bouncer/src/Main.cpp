@@ -541,7 +541,7 @@ namespace Bouncer {
         /**
          * This is used to manage user data.
          */
-        std::shared_ptr< UsersStore > users = std::make_shared< UsersStore >(usersStoreFilePath);
+        std::shared_ptr< UsersStore > users = std::make_shared< UsersStore >();
 
         // Methods
 
@@ -1140,13 +1140,14 @@ namespace Bouncer {
                 default: break;
             }
             const auto now = timeKeeper->GetCurrentTime();
-            for (auto& usersByIdEntry: usersById) {
-                auto& user = usersByIdEntry.second;
-                if (user.isJoined) {
-                    user.isJoined = false;
-                    user.totalViewTime += (now - user.joinTime);
+            users->WithAll(
+                [&](const std::shared_ptr< UserStore >& user){
+                    if (user->isJoined) {
+                        user->isJoined = false;
+                        user->AddTotalViewTime(now - user->joinTime);
+                    }
                 }
-            }
+            );
             stats.currentViewerCount = 0;
             reconnectTime = now + reconnectCooldown;
             wakeWorker.notify_one();
@@ -1508,82 +1509,10 @@ namespace Bouncer {
                 {"totalViewTimeRecorded", totalViewTimeRecorded},
                 {"forbiddenWords", Json::Array({})},
             });
-            //auto& users = json["users"];
-            //for (const auto& usersByIdEntry: usersById) {
-            //    const auto& user = usersByIdEntry.second;
-            //    auto totalViewTime = user.totalViewTime;
-            //    if (
-            //        viewTimerRunning
-            //        && user.isJoined
-            //    ) {
-            //        totalViewTime += (now - user.joinTime);
-            //    }
-            //    auto userEncoded = Json::Object({
-            //        {"id", (size_t)usersByIdEntry.first},
-            //        {"login", user.login},
-            //        {"name", user.name},
-            //        {"createdAt", user.createdAt},
-            //        {"totalViewTime", totalViewTime},
-            //        {"firstSeenTime", user.firstSeenTime},
-            //        {"firstMessageTime", user.firstMessageTime},
-            //        {"lastMessageTime", user.lastMessageTime},
-            //        {"numMessages", user.numMessages},
-            //        {"timeout", user.timeout},
-            //        {"isBanned", user.isBanned},
-            //        {"isWhitelisted", user.isWhitelisted},
-            //        {"watching", user.watching},
-            //        {"note", user.note},
-            //        {"lastChat", Json::Array({})},
-            //    });
-            //    switch (user.bot) {
-            //        case User::Bot::Yes: {
-            //            userEncoded["bot"] = "yes";
-            //        } break;
-
-            //        case User::Bot::No: {
-            //            userEncoded["bot"] = "no";
-            //        } break;
-
-            //        default: break;
-            //    }
-            //    switch (user.role) {
-            //        case User::Role::Staff: {
-            //            userEncoded["role"] = "staff";
-            //        } break;
-
-            //        case User::Role::Admin: {
-            //            userEncoded["role"] = "admin";
-            //        } break;
-
-            //        case User::Role::Broadcaster: {
-            //            userEncoded["role"] = "broadcaster";
-            //        } break;
-
-            //        case User::Role::Moderator: {
-            //            userEncoded["role"] = "moderator";
-            //        } break;
-
-            //        case User::Role::VIP: {
-            //            userEncoded["role"] = "vip";
-            //        } break;
-
-            //        case User::Role::Pleb: {
-            //            userEncoded["role"] = "pleb";
-            //        } break;
-
-            //        default: break;
-            //    }
-            //    auto& lastChat = userEncoded["lastChat"];
-            //    for (const auto& line: user.lastChat) {
-            //        lastChat.Add(line);
-            //    }
-            //    users.Add(std::move(userEncoded));
-            //}
             auto& forbiddenWords = json["forbiddenWords"];
             for (const auto& forbiddenWord: configuration.forbiddenWords) {
                 forbiddenWords.Add(forbiddenWord);
             }
-
             Json::EncodingOptions jsonEncodingOptions;
             jsonEncodingOptions.pretty = true;
             jsonEncodingOptions.reencode = true;
@@ -1731,20 +1660,7 @@ namespace Bouncer {
             const std::string& login,
             const Twitch::Messaging::TagsInfo& tags
         ) {
-            if (user->GetLogin() != login) {
-                if (!user->GetLogin().empty()) {
-                    diagnosticsSender.SendDiagnosticInformationFormatted(
-                        3,
-                        "Twitch user %" PRIdMAX " login changed from %s to %s",
-                        user->GetId(),
-                        user->GetLogin().c_str(),
-                        login.c_str()
-                    );
-                    (void)userIdsByLogin.erase(user.login);
-                }
-                user->SetLogin(login);
-            }
-            userIdsByLogin[login] = user->GetId();
+            users->SetUserId(login, user->GetId());
             if (user->GetName() != tags.displayName) {
                 if (!user->GetName().empty()) {
                     diagnosticsSender.SendDiagnosticInformationFormatted(
@@ -1833,8 +1749,8 @@ namespace Bouncer {
             std::shared_ptr< UserStore >& user,
             double time
         ) {
-            if (user->firstSeenTime == 0.0) {
-                user->firstSeenTime = time;
+            if (user->GetFirstSeenTime() == 0.0) {
+                user->SetFirstSeenTime(time);
                 diagnosticsSender.SendDiagnosticInformationFormatted(
                     2,
                     "User %" PRIdMAX " (%s) seen for the first time (%lf)",
@@ -2044,7 +1960,12 @@ namespace Bouncer {
         );
         statsSnapshot.totalViewTimeRecorded += viewTimerTotalTime;
         statsSnapshot.totalViewTimeRecordedThisInstance += viewTimerTotalTime;
-        statsSnapshot.numViewersKnown = impl_->usersById.size();
+        statsSnapshot.numViewersKnown = 0;
+        impl_->users->WithAll(
+            [&](const std::shared_ptr< UserStore >& user){
+                ++statsSnapshot.numViewersKnown;
+            }
+        );
         return statsSnapshot;
     }
 
@@ -2052,32 +1973,34 @@ namespace Bouncer {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
         const auto now = impl_->timeKeeper->GetCurrentTime();
         std::vector< User > users;
-        for (const auto& usersByIdEntry: impl_->usersById) {
-            auto userSnapshot = usersByIdEntry.second;
-            if (userSnapshot.isJoined) {
-                const auto viewTimerTotalTime = (
-                    impl_->viewTimerRunning
-                    ? now - userSnapshot.joinTime
-                    : 0.0
-                );
-                userSnapshot.totalViewTime += viewTimerTotalTime;
+        impl_->users->WithAll(
+            [&](const std::shared_ptr< UserStore >& user){
+                auto userSnapshot = user->MakeSnapshot();
+                if (userSnapshot.isJoined) {
+                    const auto viewTimerTotalTime = (
+                        impl_->viewTimerRunning
+                        ? now - userSnapshot.joinTime
+                        : 0.0
+                    );
+                    userSnapshot.totalViewTime += viewTimerTotalTime;
+                }
+                if (
+                    userSnapshot.isJoined
+                    && (now - userSnapshot.lastMessageTime < impl_->configuration.recentChatThreshold)
+                ) {
+                    userSnapshot.isRecentChatter = true;
+                }
+                if (now - userSnapshot.createdAt < impl_->configuration.newAccountAgeThreshold) {
+                    userSnapshot.isNewAccount = true;
+                }
+                if (now > userSnapshot.timeout) {
+                    userSnapshot.timeout = 0.0;
+                } else {
+                    userSnapshot.timeout -= now;
+                }
+                users.push_back(std::move(userSnapshot));
             }
-            if (
-                userSnapshot.isJoined
-                && (now - userSnapshot.lastMessageTime < impl_->configuration.recentChatThreshold)
-            ) {
-                userSnapshot.isRecentChatter = true;
-            }
-            if (now - userSnapshot.createdAt < impl_->configuration.newAccountAgeThreshold) {
-                userSnapshot.isNewAccount = true;
-            }
-            if (now > userSnapshot.timeout) {
-                userSnapshot.timeout = 0.0;
-            } else {
-                userSnapshot.timeout -= now;
-            }
-            users.push_back(std::move(userSnapshot));
-        }
+        );
         return users;
     }
 
@@ -2168,12 +2091,13 @@ namespace Bouncer {
         impl_->viewTimerRunning = true;
         impl_->viewTimerStart = impl_->timeKeeper->GetCurrentTime();
         impl_->PostStatus("View timer has started");
-        for (auto& usersByIdEntry: impl_->usersById) {
-            auto& user = usersByIdEntry.second;
-            if (user.isJoined) {
-                user.joinTime = impl_->viewTimerStart;
+        impl_->users->WithAll(
+            [&](const std::shared_ptr< UserStore >& user){
+                if (user->isJoined) {
+                    user->joinTime = impl_->viewTimerStart;
+                }
             }
-        }
+        );
     }
 
     void Main::StartWatching(intmax_t userid) {
@@ -2196,12 +2120,13 @@ namespace Bouncer {
         impl_->stats.totalViewTimeRecordedThisInstance += viewTimerTotalTime;
         impl_->stats.totalViewTimeRecorded += viewTimerTotalTime;
         impl_->PostStatus("View timer has stopped");
-        for (auto& usersByIdEntry: impl_->usersById) {
-            auto& user = usersByIdEntry.second;
-            if (user.isJoined) {
-                user.totalViewTime += (now - user.joinTime);
+        impl_->users->WithAll(
+            [&](const std::shared_ptr< UserStore >& user){
+                if (user->isJoined) {
+                    user->AddTotalViewTime(now - user->joinTime);
+                }
             }
-        }
+        );
     }
 
     void Main::StopWatching(intmax_t userid) {

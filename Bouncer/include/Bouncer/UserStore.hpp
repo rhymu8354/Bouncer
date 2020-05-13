@@ -7,6 +7,7 @@
  */
 
 #include <Bouncer/User.hpp>
+#include <Bouncer/UserStoreContainer.hpp>
 #include <memory>
 #include <stddef.h>
 #include <stdint.h>
@@ -15,14 +16,23 @@
 
 namespace Bouncer {
 
-    class UsersStore;
-
     /**
      * This represents a single Twitch user known by the Bouncer.  All public
      * properties are ephemeral, and methods are provided to get/set
      * persistent information about the user.
      */
     class UserStore {
+        // Public Properties
+    public:
+        double joinTime = 0.0;
+        double partTime = 0.0;
+        double firstMessageTimeThisInstance = 0.0;
+        size_t numMessagesThisInstance = 0;
+        bool isJoined = false;
+        bool isRecentChatter = false;
+        bool isNewAccount = false;
+        bool needsGreeting = false;
+
         // Lifecycle
     public:
         ~UserStore() noexcept;
@@ -33,29 +43,17 @@ namespace Bouncer {
 
         // Methods
     public:
-        UserStore();
-        void Connect(std::weak_ptr< UsersStore > container);
-        void Create(const User& user);
-
-        // Public Properties
-    public:
-        double joinTime = 0.0;
-        double partTime = 0.0;
-        double firstSeenTime = 0.0;
-        double firstMessageTimeThisInstance = 0.0;
-        size_t numMessagesThisInstance = 0;
-        bool isJoined = false;
-        bool isRecentChatter = false;
-        bool isNewAccount = false;
-        bool needsGreeting = false;
-
-        // Methods
-    public:
+        explicit UserStore(
+            const User& user,
+            std::weak_ptr< UserStoreContainer > container
+        );
         void AddLastChat(std::string&& chat);
         void AddTotalViewTime(double time);
+        void Create();
         User::Bot GetBot() const;
         double GetCreatedAt() const;
         double GetFirstMessageTime() const;
+        double GetFirstSeenTime() const;
         intmax_t GetId() const;
         bool GetIsBanned() const;
         bool GetIsWhitelisted() const;
@@ -70,9 +68,11 @@ namespace Bouncer {
         double GetTotalViewTime() const;
         bool GetWatching() const;
         void IncrementNumMessages();
+        User MakeSnapshot() const;
         void SetBot(User::Bot bot);
         void SetCreatedAt(double createdAt);
         void SetFirstMessageTime(double firstMessageTime);
+        void SetFirstSeenTime(double firstSeenTime);
         void SetIsBanned(bool isBanned);
         void SetIsWhitelisted(bool isWhitelisted);
         void SetLastMessageTime(double lastMessageTime);
