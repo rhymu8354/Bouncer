@@ -159,12 +159,27 @@ namespace Bouncer.Wpf.View {
             }
         }
 
+        private void OnSetUpLights(object sender, ExecutedRoutedEventArgs e) {
+            var lightsWindow = new LightsWindow();
+            lightsWindow.Owner = this;
+            lightsWindow.Lights = Model.Lights;
+            lightsWindow.Show();
+        }
+
         private void OnStopWatching(object sender, ExecutedRoutedEventArgs e) {
             var user = e.Parameter as Model.User;
             if (user == null) {
                 return;
             }
             Model.StopWatching(user);
+        }
+
+        private void OnTurnLightsOff(object sender, ExecutedRoutedEventArgs e) {
+            Model.Lights.On = false;
+        }
+
+        private void OnTurnLightsOn(object sender, ExecutedRoutedEventArgs e) {
+            Model.Lights.On = true;
         }
 
         private void OnUnban(object sender, ExecutedRoutedEventArgs e) {

@@ -8,6 +8,7 @@
  * © 2019 by Richard Walters
  */
 
+#include <stdint.h>
 #include <string>
 #include <vector>
 
@@ -31,6 +32,8 @@ namespace Bouncer {
         bool autoBanTitleScammers = false;
         bool autoBanForbiddenWords = false;
         std::vector< std::string > forbiddenWords;
+        std::string buddyHost;
+        uint16_t buddyPort;
     };
 
 }

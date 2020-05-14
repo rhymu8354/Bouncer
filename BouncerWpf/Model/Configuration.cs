@@ -69,6 +69,26 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        public string BuddyHost {
+            get {
+                return Adaptee.buddyHost;
+            }
+            set {
+                Adaptee.buddyHost = value;
+                NotifyPropertyChanged("BuddyHost");
+            }
+        }
+
+        public ushort BuddyPort {
+            get {
+                return Adaptee.buddyPort;
+            }
+            set {
+                Adaptee.buddyPort = value;
+                NotifyPropertyChanged("BuddyPort");
+            }
+        }
+
         public string Token {
             get {
                 return Adaptee.token;

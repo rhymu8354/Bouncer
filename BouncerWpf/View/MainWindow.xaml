@@ -16,9 +16,12 @@
         <CommandBinding Command="local:Commands.MarkNotBot" Executed="OnMarkNotBot" />
         <CommandBinding Command="local:Commands.MarkPossibleBot" Executed="OnMarkPossibleBot" />
         <CommandBinding Command="local:Commands.QueryChannelStats" Executed="OnQueryChannelStats" />
+        <CommandBinding Command="local:Commands.SetUpLights" Executed="OnSetUpLights" />
         <CommandBinding Command="local:Commands.StartWatching" Executed="OnStartWatching" />
         <CommandBinding Command="local:Commands.StopWatching" Executed="OnStopWatching" />
         <CommandBinding Command="local:Commands.TimeOut" Executed="OnTimeOut" />
+        <CommandBinding Command="local:Commands.TurnLightsOff" Executed="OnTurnLightsOff" />
+        <CommandBinding Command="local:Commands.TurnLightsOn" Executed="OnTurnLightsOn" />
         <CommandBinding Command="local:Commands.Unban" Executed="OnUnban" />
         <CommandBinding Command="local:Commands.Unwhitelist" Executed="OnUnwhitelist" />
         <CommandBinding Command="local:Commands.Whitelist" Executed="OnWhitelist" />
@@ -36,6 +39,12 @@
                 <MenuItem Header="_Configuration" Command="local:Commands.Configure" />
                 <Separator />
                 <MenuItem Header="E_xit" ToolTip="Close the Application" Command="local:Commands.Exit" InputGestureText="Alt+F4" />
+            </MenuItem>
+            <MenuItem Header="_Lights">
+                <MenuItem Header="O_n" Command="local:Commands.TurnLightsOn" IsChecked="{Binding Lights.On}" />
+                <MenuItem Header="O_ff" Command="local:Commands.TurnLightsOff" IsChecked="{Binding Lights.Off}" />
+                <Separator />
+                <MenuItem Header="_Set Up" Command="local:Commands.SetUpLights" />
             </MenuItem>
             <MenuItem Header="_Channel">
                 <MenuItem Header="_View Timer" IsCheckable="True" IsChecked="{Binding ViewTimerRunning}" />

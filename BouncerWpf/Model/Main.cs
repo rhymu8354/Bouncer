@@ -55,6 +55,13 @@ namespace Bouncer.Wpf.Model {
             }
         }
 
+        private Lights lights_ = new Lights();
+        public Lights Lights {
+            get {
+                return lights_;
+            }
+        }
+
         private int maxMessages_ = 1000;
         public int MaxMessages {
             get {
@@ -623,6 +630,7 @@ namespace Bouncer.Wpf.Model {
             Native = new Bouncer.Main();
             HostFacet = new Host(this);
             Native.StartApplication(HostFacet);
+            Lights.PropertyChanged += OnLightsPropertyChanged;
             Stats = Native.GetStats();
             var usersListLiveShaping = CollectionViewSource.GetDefaultView(Users) as ICollectionViewLiveShaping;
             if (usersListLiveShaping != null) {
@@ -699,6 +707,7 @@ namespace Bouncer.Wpf.Model {
         protected virtual void Dispose(bool disposing) {
             if (!Disposed) {
                 if (disposing) {
+                    Lights.PropertyChanged -= OnLightsPropertyChanged;
                     RefreshTimer.Tick -= OnRefreshTimerTick;
                     Stats = null;
                     Native = null;
@@ -811,6 +820,19 @@ namespace Bouncer.Wpf.Model {
 
         private void NotifyPropertyChanged(string propertyName) {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private void OnLightsPropertyChanged(object sender, PropertyChangedEventArgs e) {
+            if (Lights.On) {
+                Native.LightsOn(
+                    Lights.Red,
+                    Lights.Green,
+                    Lights.Blue,
+                    Lights.Brightness
+                );
+            } else if (e.PropertyName == "On") {
+                Native.LightsOff();
+            }
         }
 
         private void OnRefreshTimerTick(object sender, EventArgs e) {

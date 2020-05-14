@@ -46,6 +46,15 @@ namespace Bouncer {
 
         std::vector< User > GetUsers();
 
+        void LightsOn(
+            double red,
+            double green,
+            double blue,
+            double brightness
+        );
+
+        void LightsOff();
+
         void MarkGreeted(intmax_t userid);
 
         void QueryChannelStats();

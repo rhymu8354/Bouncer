@@ -20,6 +20,7 @@ if(MSVC)
         App.xaml.cs
         EventArgs.cs
         Model/Configuration.cs
+        Model/Lights.cs
         Model/Main.cs
         Model/Message.cs
         Model/User.cs
@@ -28,6 +29,8 @@ if(MSVC)
         Properties/AssemblyInfo.cs
         Properties/Resources.resx
         Properties/Resources.Designer.cs
+        Properties/Settings.Designer.cs
+        Properties/Settings.settings
         Utilities.cs
         View/ChosenItemDataTemplateSelector.cs
         View/Commands.cs
@@ -36,6 +39,8 @@ if(MSVC)
         View/ConfigureForbiddenWordsWindow.xaml
         View/ConfigureForbiddenWordsWindow.xaml.cs
         View/FindDescendant.cs
+        View/LightsWindow.xaml
+        View/LightsWindow.xaml.cs
         View/ListBoxExtensions.cs
         View/MainWindow.xaml
         View/MainWindow.xaml.cs

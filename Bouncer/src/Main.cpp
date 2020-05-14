@@ -648,6 +648,8 @@ namespace Bouncer {
             configuration.autoTimeOutNewAccountChatters = (bool)json["autoTimeOutNewAccountChatters"];
             configuration.autoBanTitleScammers = (bool)json["autoBanTitleScammers"];
             configuration.autoBanForbiddenWords = (bool)json["autoBanForbiddenWords"];
+            configuration.buddyHost = (std::string)json["buddyHost"];
+            configuration.buddyPort = (uint16_t)(int)json["buddyPort"];
             stats.maxViewerCount = (size_t)json["maxViewerCount"];
             stats.totalViewTimeRecorded = (double)json["totalViewTimeRecorded"];
             userJoinsByLogin.clear();
@@ -1368,6 +1370,53 @@ namespace Bouncer {
             );
         }
 
+        void PostLighterCall(
+            const std::vector< std::string >& path,
+            const std::string& query = ""
+        ) {
+            const auto id = nextHttpClientTransactionId++;
+            diagnosticsSender.SendDiagnosticInformationFormatted(
+                0,
+                "Lighter call %d: %s",
+                id,
+                query.c_str()
+            );
+            Http::Request request;
+            request.method = "GET";
+            request.target.SetScheme("http");
+            request.target.SetHost(configuration.buddyHost);
+            request.target.SetPort(configuration.buddyPort);
+            request.target.SetPath(path);
+            request.target.SetQuery(query);
+            auto& httpClientTransaction = httpClientTransactions[id];
+            httpClientTransaction = httpClient->Request(request);
+            auto selfWeakCopy(selfWeak);
+            httpClientTransaction->SetCompletionDelegate(
+                [
+                    id,
+                    selfWeakCopy
+                ]{
+                    auto impl = selfWeakCopy.lock();
+                    if (impl == nullptr) {
+                        return;
+                    }
+                    std::lock_guard< decltype(impl->mutex) > lock(impl->mutex);
+                    auto httpClientTransactionsEntry = impl->httpClientTransactions.find(id);
+                    if (httpClientTransactionsEntry == impl->httpClientTransactions.end()) {
+                        return;
+                    }
+                    const auto& httpClientTransaction = httpClientTransactionsEntry->second;
+                    impl->diagnosticsSender.SendDiagnosticInformationFormatted(
+                        0,
+                        "Lighter call %d returned code %u",
+                        id,
+                        httpClientTransaction->response.statusCode
+                    );
+                    (void)impl->httpClientTransactions.erase(httpClientTransactionsEntry);
+                }
+            );
+        }
+
         void PostStatus(const std::string& message) {
             diagnosticsSender.SendDiagnosticInformationString(3, message);
         }
@@ -1508,6 +1557,8 @@ namespace Bouncer {
                 {"maxViewerCount", stats.maxViewerCount},
                 {"totalViewTimeRecorded", totalViewTimeRecorded},
                 {"forbiddenWords", Json::Array({})},
+                {"buddyHost", configuration.buddyHost},
+                {"buddyPort", configuration.buddyPort},
             });
             auto& forbiddenWords = json["forbiddenWords"];
             for (const auto& forbiddenWord: configuration.forbiddenWords) {
@@ -1815,10 +1866,18 @@ namespace Bouncer {
                     const std::string& scheme,
                     const std::string& serverName
                 ) -> std::shared_ptr< SystemAbstractions::INetworkConnection > {
-                    const auto decorator = std::make_shared< TlsDecorator::TlsDecorator >();
                     const auto connection = std::make_shared< SystemAbstractions::NetworkConnection >();
-                    decorator->ConfigureAsClient(connection, caCerts, serverName);
-                    return decorator;
+                    if (
+                        (scheme == "https")
+                        || (scheme == "wss")
+                    ) {
+                        const auto decorator = std::make_shared< TlsDecorator::TlsDecorator >();
+                        decorator->ConfigureAsClient(connection, caCerts, serverName);
+                        decorator->SubscribeToDiagnostics(diagnosticsPublisher);
+                        return decorator;
+                    } else {
+                        return connection;
+                    }
                 }
             );
             httpClientDeps.transport = transport;
@@ -2002,6 +2061,30 @@ namespace Bouncer {
             }
         );
         return users;
+    }
+
+    void Main::LightsOn(
+        double red,
+        double green,
+        double blue,
+        double brightness
+    ) {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        impl_->PostLighterCall(
+            {"on"},
+            StringExtensions::sprintf(
+                "b=%d&c=%02x%02x%02x",
+                (int)(brightness * 31.0),
+                (int)(red * 255.0),
+                (int)(green * 255.0),
+                (int)(blue * 255.0)
+            )
+        );
+    }
+
+    void Main::LightsOff() {
+        std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+        impl_->PostLighterCall({"off"});
     }
 
     void Main::MarkGreeted(intmax_t userid) {

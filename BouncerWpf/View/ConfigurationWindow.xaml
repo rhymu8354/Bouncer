@@ -25,6 +25,8 @@
             <RowDefinition Height="auto" />
             <RowDefinition Height="auto" />
             <RowDefinition Height="auto" />
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="auto" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="auto" />
@@ -60,7 +62,11 @@
             <CheckBox IsChecked="{Binding AutoBanForbiddenWords}" VerticalAlignment="Center" />
             <Button Content="Configure" Width="75" Margin="20,0" Command="local:Commands.Configure" />
         </StackPanel>
-        <Grid Grid.Row="12" Grid.ColumnSpan="2" Margin="20,10">
+        <Label Grid.Row="12" Grid.Column="0" HorizontalAlignment="Right" Content="Buddy host:" />
+        <TextBox Text="{Binding BuddyHost}" Grid.Row="12" Grid.Column="1" Width="500" VerticalAlignment="Center" />
+        <Label Grid.Row="13" Grid.Column="0" HorizontalAlignment="Right" Content="Buddy port:" />
+        <TextBox Text="{Binding BuddyPort}" Grid.Row="13" Grid.Column="1" Width="500" VerticalAlignment="Center" />
+        <Grid Grid.Row="14" Grid.ColumnSpan="2" Margin="20,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="auto" />
                 <ColumnDefinition Width="*" />
