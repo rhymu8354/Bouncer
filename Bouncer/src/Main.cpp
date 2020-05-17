@@ -909,7 +909,17 @@ namespace Bouncer {
                     ) {
                         std::string forbiddenWordFound;
                         for (const auto& forbiddenWord: configuration.forbiddenWords) {
-                            if (messageInfo.messageContent.find(forbiddenWord) != std::string::npos) {
+                            if (
+                                std::search(
+                                    messageInfo.messageContent.begin(),
+                                    messageInfo.messageContent.end(),
+                                    forbiddenWord.begin(),
+                                    forbiddenWord.end(),
+                                    [](char lhs, char rhs){
+                                        return tolower(lhs) == tolower(rhs);
+                                    }
+                                ) != messageInfo.messageContent.end()
+                            ) {
                                 forbiddenWordFound = forbiddenWord;
                                 break;
                             }
