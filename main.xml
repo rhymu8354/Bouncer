@@ -4,82 +4,82 @@
         <repository
             path="AsyncData"
             url="git@github.com:rhymu8354/AsyncData.git"
-            branch="master"
+            branch="main"
             />
         <repository
             path="Base64"
             url="git@github.com:rhymu8354/Base64.git"
-            branch="master"
+            branch="main"
             />
         <repository
             path="Http"
             url="git@github.com:rhymu8354/Http.git"
-            branch="master"
+            branch="main"
             />
         <repository
             path="HttpNetworkTransport"
             url="git@github.com:rhymu8354/HttpNetworkTransport.git"
-            branch="master"
+            branch="main"
             />
         <repository
             path="Json"
             url="git@github.com:rhymu8354/Json.git"
-            branch="master"
+            branch="main"
             />
         <repository
             path="LibreSSL"
             url="git@github.com:rhymu8354/LibreSSL.git"
-            branch="master"
+            branch="main"
             />
         <repository
             path="MessageHeaders"
             url="git@github.com:rhymu8354/MessageHeaders.git"
-            branch="master"
+            branch="main"
             />
         <repository
             path="SQLite"
             url="git@github.com:rhymu8354/SQLite.git"
-            branch="master"
+            branch="main"
             />
         <repository
             path="StringExtensions"
             url="git@github.com:rhymu8354/StringExtensions.git"
-            branch="master"
+            branch="main"
             />
         <repository
             path="SystemAbstractions"
             url="git@github.com:rhymu8354/SystemAbstractions.git"
-            branch="master"
+            branch="main"
             />
         <repository
             path="Timekeeping"
             url="git@github.com:rhymu8354/Timekeeping.git"
-            branch="master"
+            branch="main"
             />
         <repository
             path="TlsDecorator"
             url="git@github.com:rhymu8354/TlsDecorator.git"
-            branch="master"
+            branch="main"
             />
         <repository
             path="Twitch"
             url="git@github.com:rhymu8354/Twitch.git"
-            branch="master"
+            branch="main"
             />
         <repository
             path="TwitchNetworkTransport"
             url="git@github.com:rhymu8354/TwitchNetworkTransport.git"
-            branch="master"
+            branch="main"
             />
         <repository
             path="Uri"
             url="git@github.com:rhymu8354/Uri.git"
-            branch="master"
+            branch="main"
             />
         <repository
             path="Utf8"
             url="git@github.com:rhymu8354/Utf8.git"
-            branch="master"
+            branch="main"
             />
         <repository
             path="googletest"
